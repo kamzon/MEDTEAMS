@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useClinicStore } from '../../store/useClinicStore';
 import { Plus, Clock, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -16,6 +16,9 @@ export default function CalendarPage() {
     dateTime: new Date().toISOString().slice(0, 16),
     reason: '',
   });
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
+  const calendarScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Get start and end of current week
   const [weekStart, setWeekStart] = useState<Date>(() => {
@@ -25,9 +28,44 @@ export default function CalendarPage() {
     return new Date(date.setDate(diff));
   });
 
-  // Time slots for the calendar (09:00 to 17:00)
-  const timeSlots = Array.from({ length: 9 }, (_, i) => {
-    const hour = 9 + i;
+  const formatDateTimeLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const openAppointmentModal = (day: Date, hour: number) => {
+    const nextDateTime = new Date(day);
+    nextDateTime.setHours(hour, 0, 0, 0);
+
+    setFormData({
+      patientId: '',
+      dateTime: formatDateTimeLocal(nextDateTime),
+      reason: '',
+    });
+    setPatientSearchQuery('');
+    setIsPatientDropdownOpen(false);
+    setIsModalOpen(true);
+  };
+
+  const openBlankAppointmentModal = () => {
+    setFormData({
+      patientId: '',
+      dateTime: new Date().toISOString().slice(0, 16),
+      reason: '',
+    });
+    setPatientSearchQuery('');
+    setIsPatientDropdownOpen(false);
+    setIsModalOpen(true);
+  };
+
+  // Time slots for the calendar (00:00 to 23:00)
+  const timeSlots = Array.from({ length: 24 }, (_, i) => {
+    const hour = i;
     return {
       hour,
       label: `${String(hour).padStart(2, '0')}:00`,
@@ -83,12 +121,7 @@ export default function CalendarPage() {
     });
 
     // Reset form and close modal
-    setFormData({
-      patientId: '',
-      dateTime: new Date().toISOString().slice(0, 16),
-      reason: '',
-    });
-    setIsModalOpen(false);
+    closeModal();
   };
 
   // Get appointments for a specific day and time slot
@@ -129,6 +162,42 @@ export default function CalendarPage() {
     return labels[status] || status;
   };
 
+  const filteredPatients = patients.filter((patient) => {
+    const query = patientSearchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    return (
+      patient.name.toLowerCase().includes(query) ||
+      patient.amo_id.toLowerCase().includes(query)
+    );
+  });
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormData({
+      patientId: '',
+      dateTime: new Date().toISOString().slice(0, 16),
+      reason: '',
+    });
+    setPatientSearchQuery('');
+    setIsPatientDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    const scrollContainer = calendarScrollRef.current;
+    if (!scrollContainer) {
+      return;
+    }
+
+    const targetHour = scrollContainer.querySelector<HTMLElement>('[data-hour="8"]');
+    if (targetHour) {
+      scrollContainer.scrollTop = Math.max(targetHour.offsetTop - 72, 0);
+    }
+  }, []);
+
   return (
     <div className="w-full min-h-screen bg-slate-50 p-8">
       {/* Header */}
@@ -140,7 +209,7 @@ export default function CalendarPage() {
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openBlankAppointmentModal}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors shadow-md"
         >
           <Plus className="w-5 h-5" />
@@ -169,78 +238,108 @@ export default function CalendarPage() {
 
       {/* Calendar Grid */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Header Row - Day Names */}
-        <div className="grid grid-cols-8 border-b border-slate-200">
-          {/* Time column header */}
-          <div className="col-span-1 p-4 bg-slate-50 border-r border-slate-200">
-            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Time</p>
+        <div ref={calendarScrollRef} className="overflow-auto max-h-[75vh] scroll-smooth">
+          {/* Header Row - Day Names */}
+          <div className="grid grid-cols-8 border-b border-slate-200 sticky top-0 z-20 bg-white">
+            {/* Time column header */}
+            <div className="col-span-1 p-4 bg-slate-50 border-r border-slate-200">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Time</p>
+            </div>
+
+            {/* Day headers */}
+            {weekDays.map((day, idx) => (
+              <div key={idx} className="col-span-1 p-4 bg-white border-r border-slate-200 text-center">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                  {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                </p>
+                <p className="text-lg font-bold text-slate-900 mt-1">{day.getDate()}</p>
+              </div>
+            ))}
           </div>
 
-          {/* Day headers */}
-          {weekDays.map((day, idx) => (
-            <div key={idx} className="col-span-1 p-4 bg-slate-50 border-r border-slate-200 text-center">
-              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                {day.toLocaleDateString('en-US', { weekday: 'short' })}
-              </p>
-              <p className="text-lg font-bold text-slate-900 mt-1">{day.getDate()}</p>
-            </div>
-          ))}
-        </div>
+          {/* Time slots and appointments */}
+          {timeSlots.map((slot, slotIdx) => {
+            const isBusinessHour = slot.hour >= 8 && slot.hour <= 18;
 
-        {/* Time slots and appointments */}
-        {timeSlots.map((slot, slotIdx) => (
-          <div key={slotIdx} className="grid grid-cols-8 border-b border-slate-200 min-h-24">
-            {/* Time label */}
-            <div className="col-span-1 p-4 bg-slate-50 border-r border-slate-200 flex items-center justify-center sticky left-0">
-              <p className="text-sm font-semibold text-slate-700">{slot.label}</p>
-            </div>
-
-            {/* Day cells */}
-            {weekDays.map((day, dayIdx) => {
-              const slotAppointments = getAppointmentsForSlot(day, slot.hour);
-              const hasAppointments = slotAppointments.length > 0;
-
-              return (
+            return (
+              <div key={slotIdx} data-hour={slot.hour} className="grid grid-cols-8 border-b border-slate-200 min-h-24">
+                {/* Time label */}
                 <div
-                  key={dayIdx}
-                  className={`col-span-1 p-2 border-r border-slate-200 relative ${
-                    hasAppointments ? 'bg-white' : 'bg-slate-50 hover:bg-slate-100 transition-colors'
+                  className={`col-span-1 p-4 border-r border-slate-200 flex items-center justify-center sticky left-0 z-10 ${
+                    isBusinessHour ? 'bg-white' : 'bg-slate-50'
                   }`}
                 >
-                  {hasAppointments ? (
-                    <div className="space-y-1">
-                      {slotAppointments.map((apt) => {
-                        const patient = patients.find((p) => p.id === apt.patient_id);
-                        const aptTime = new Date(apt.date_time);
-                        const displayTime = `${String(aptTime.getHours()).padStart(2, '0')}:${String(aptTime.getMinutes()).padStart(2, '0')}`;
-
-                        return (
-                          <div
-                            key={apt.id}
-                            className={`p-2 rounded-lg border-l-4 text-xs cursor-pointer hover:shadow-md transition-shadow ${getStatusColor(apt.status)}`}
-                          >
-                            <div className="font-semibold text-slate-900 truncate">
-                              {patient?.name || 'Unknown Patient'}
-                            </div>
-                            <div className="text-slate-600 mt-1 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {displayTime}
-                            </div>
-                            <div className="mt-1">
-                              <span className="inline-block px-1.5 py-0.5 bg-white bg-opacity-60 rounded text-xs font-medium">
-                                {getStatusBadge(apt.status)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
+                  <p className="text-sm font-semibold text-slate-700">{slot.label}</p>
                 </div>
-              );
-            })}
-          </div>
-        ))}
+
+                {/* Day cells */}
+                {weekDays.map((day, dayIdx) => {
+                  const slotAppointments = getAppointmentsForSlot(day, slot.hour);
+                  const hasAppointments = slotAppointments.length > 0;
+                  const cellDate = new Date(day);
+                  cellDate.setHours(slot.hour, 0, 0, 0);
+                  const cellDateTime = formatDateTimeLocal(cellDate);
+
+                  return (
+                    <button
+                      key={dayIdx}
+                      type="button"
+                      onClick={() => {
+                        if (!hasAppointments) {
+                          openAppointmentModal(day, slot.hour);
+                        }
+                      }}
+                      className={`col-span-1 p-2 border-r border-slate-200 relative text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-200 ${
+                        hasAppointments
+                          ? 'bg-white cursor-default'
+                          : isBusinessHour
+                            ? 'bg-white hover:bg-teal-50/60 cursor-pointer'
+                            : 'bg-slate-50 hover:bg-slate-100 cursor-pointer'
+                      }`}
+                      aria-label={`Create appointment for ${day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at ${slot.label}`}
+                    >
+                      {hasAppointments ? (
+                        <div className="space-y-1">
+                          {slotAppointments.map((apt) => {
+                            const patient = patients.find((p) => p.id === apt.patient_id);
+                            const aptTime = new Date(apt.date_time);
+                            const displayTime = `${String(aptTime.getHours()).padStart(2, '0')}:${String(aptTime.getMinutes()).padStart(2, '0')}`;
+
+                            return (
+                              <div
+                                key={apt.id}
+                                className={`p-2 rounded-lg border-l-4 text-xs cursor-pointer hover:shadow-md transition-shadow ${getStatusColor(apt.status)}`}
+                              >
+                                <div className="font-semibold text-slate-900 truncate">
+                                  {patient?.name || 'Unknown Patient'}
+                                </div>
+                                <div className="text-slate-600 mt-1 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {displayTime}
+                                </div>
+                                <div className="mt-1">
+                                  <span className="inline-block px-1.5 py-0.5 bg-white bg-opacity-60 rounded text-xs font-medium">
+                                    {getStatusBadge(apt.status)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex h-full min-h-24 items-start justify-start">
+                          <span className="text-[10px] font-medium text-slate-400 opacity-0 transition-opacity hover:opacity-100">
+                            {cellDateTime}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Modal */}
@@ -255,7 +354,7 @@ export default function CalendarPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
               >
                 Close
@@ -270,20 +369,51 @@ export default function CalendarPage() {
                   <User className="w-4 h-4" />
                   Patient
                 </span>
-                <select
-                  required
-                  name="patientId"
-                  value={formData.patientId}
-                  onChange={handleFormChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
-                >
-                  <option value="">Select a patient...</option>
-                  {patients.map((patient) => (
-                    <option key={patient.id} value={patient.id}>
-                      {patient.name} ({patient.amo_id})
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    required
+                    type="text"
+                    value={patientSearchQuery}
+                    onChange={(event) => {
+                      const nextQuery = event.target.value;
+                      setPatientSearchQuery(nextQuery);
+                      setIsPatientDropdownOpen(true);
+                      setFormData((prev) => ({ ...prev, patientId: '' }));
+                    }}
+                    onFocus={() => setIsPatientDropdownOpen(true)}
+                    placeholder="Search by name or AMO ID..."
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  />
+
+                  {isPatientDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100">
+                      {filteredPatients.length > 0 ? (
+                        filteredPatients.map((patient) => (
+                          <button
+                            key={patient.id}
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                patientId: patient.id,
+                              }));
+                              setPatientSearchQuery(`${patient.name} (${patient.amo_id})`);
+                              setIsPatientDropdownOpen(false);
+                            }}
+                            className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50"
+                          >
+                            <span className="text-sm font-semibold text-slate-900">{patient.name}</span>
+                            <span className="text-xs text-slate-500">AMO ID: {patient.amo_id}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-slate-500">
+                          No matching patients found.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </label>
 
               {/* Date & Time */}
@@ -319,7 +449,7 @@ export default function CalendarPage() {
               <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 mt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   Cancel
