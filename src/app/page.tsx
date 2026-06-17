@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useClinicStore } from '../store/useClinicStore';
 import {
@@ -10,10 +11,12 @@ import {
   UserPlus,
   FileText,
   ChevronRight,
+  ClipboardCheck,
 } from 'lucide-react';
 
 export default function DashboardPage() {
   const appointments = useClinicStore((state) => state.appointments);
+  const consultations = useClinicStore((state) => state.consultations);
   const patients = useClinicStore((state) => state.patients);
   const addPatient = useClinicStore((state) => state.addPatient);
   const addAppointment = useClinicStore((state) => state.addAppointment);
@@ -59,6 +62,87 @@ export default function DashboardPage() {
   const todaysAgenda = [...todaysAppointments]
     .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
     .slice(0, 4);
+
+  const completedExaminations = Array.from(
+    (() => {
+      const examinationMap = new Map<
+        string,
+        {
+          id: string;
+          patientId: string;
+          patientName: string;
+          completedAt: string;
+          summary: string;
+          hasPrescription: boolean;
+        }
+      >();
+
+      appointments
+        .filter(
+          (appointment) =>
+            appointment.date_time.slice(0, 10) === todayKey &&
+            (appointment.status === 'in_exam' || appointment.status === 'completed')
+        )
+        .forEach((appointment) => {
+          const consultation = consultations.find(
+            (item) =>
+              item.appointment_id === appointment.id && item.date.slice(0, 10) === todayKey
+          );
+          const patient = patients.find((item) => item.id === appointment.patient_id);
+          const completedAt = consultation?.date ?? appointment.date_time;
+          const summarySource =
+            consultation?.soap_assessment?.trim() ||
+            consultation?.soap_plan?.trim() ||
+            appointment.notes.trim() ||
+            'Exam in progress';
+
+          examinationMap.set(appointment.id, {
+            id: appointment.id,
+            patientId: appointment.patient_id,
+            patientName: patient?.name ?? 'Unknown patient',
+            completedAt,
+            summary: summarySource,
+            hasPrescription:
+              Boolean(consultation?.prescribed_meds.length) ||
+              Boolean(consultation?.soap_plan.trim()),
+          });
+        });
+
+      consultations
+        .filter((consultation) => consultation.date.slice(0, 10) === todayKey)
+        .forEach((consultation) => {
+          const appointment = appointments.find(
+            (item) => item.id === consultation.appointment_id
+          );
+          const patient = patients.find(
+            (item) => item.id === consultation.patient_id || item.id === appointment?.patient_id
+          );
+          const recordKey = consultation.appointment_id || consultation.id;
+
+          if (examinationMap.has(recordKey)) {
+            return;
+          }
+
+          examinationMap.set(recordKey, {
+            id: recordKey,
+            patientId: consultation.patient_id || appointment?.patient_id || '',
+            patientName: patient?.name ?? 'Unknown patient',
+            completedAt: consultation.date,
+            summary:
+              consultation.soap_assessment.trim() ||
+              consultation.soap_plan.trim() ||
+              appointment?.notes.trim() ||
+              'Assessment not recorded',
+            hasPrescription:
+              Boolean(consultation.prescribed_meds.length) ||
+              Boolean(consultation.soap_plan.trim()),
+          });
+        });
+
+      return examinationMap;
+    })().values()
+  )
+    .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
 
   const filteredPatients = patients.filter((patient) => {
     const query = searchQuery.trim().toLowerCase();
@@ -637,6 +721,66 @@ export default function DashboardPage() {
                 })}
               </div>
             )}
+
+            {/* Completed Today */}
+            <div className="mt-6 bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-5 h-5 bg-teal-100 rounded-lg flex items-center justify-center">
+                  <ClipboardCheck className="w-3.5 h-3.5 text-teal-600" strokeWidth={2.5} />
+                </div>
+                <h2 className="text-lg font-bold text-slate-900">Completed Today</h2>
+                <span className="ml-auto text-xs font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
+                  {completedExaminations.length} {completedExaminations.length === 1 ? 'case' : 'cases'}
+                </span>
+              </div>
+
+              {completedExaminations.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                  <p className="text-sm font-medium text-slate-700">No completed examinations yet</p>
+                  <p className="mt-1 text-xs text-slate-500">Finished consults will appear here once they are marked complete.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {completedExaminations.map((entry) => {
+                    const completedTime = formatTime(entry.completedAt);
+
+                    return (
+                      <Link
+                        key={entry.id}
+                        href={`/patients/${entry.patientId}`}
+                        className="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/50 focus:outline-none focus:ring-4 focus:ring-teal-100"
+                      >
+                        <article className="cursor-pointer">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="truncate text-sm font-semibold text-slate-900">
+                                  {entry.patientName}
+                                </h3>
+                                <span className="text-xs font-medium text-slate-500">{completedTime}</span>
+                              </div>
+                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                                {entry.summary}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${
+                                entry.hasPrescription
+                                  ? 'border border-teal-200 bg-teal-50 text-teal-700'
+                                  : 'border border-slate-200 bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {entry.hasPrescription ? 'Prescription Issued' : 'No Medication'}
+                            </span>
+                          </div>
+                        </article>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
