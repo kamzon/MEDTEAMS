@@ -1,0 +1,22 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+
+# tauri / rust
+src-tauri/target
+
+# env files
+.env
+.env.*
+!.env.example
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# system
+.DS_Store

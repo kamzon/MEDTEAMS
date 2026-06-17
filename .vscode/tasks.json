@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build-recovered-medteams",
+			"type": "shell",
+			"command": "cd \"/Users/noureddinekamzon/Desktop/project2026/MedTeams\" && npm run build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "build-recovered-medteams",
+			"type": "shell",
+			"command": "cd \"/Users/noureddinekamzon/Desktop/project2026/MedTeams\" && npm run build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "build-recovered-medteams",
+			"type": "shell",
+			"command": "cd \"/Users/noureddinekamzon/Desktop/project2026/MedTeams\" && npm run build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		}
+	]
+}

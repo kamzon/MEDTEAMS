@@ -1,0 +1,699 @@
+'use client';
+
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useClinicStore } from '../store/useClinicStore';
+import {
+  Users,
+  Clock,
+  Calendar,
+  QrCode,
+  UserPlus,
+  FileText,
+  ChevronRight,
+} from 'lucide-react';
+
+export default function DashboardPage() {
+  const appointments = useClinicStore((state) => state.appointments);
+  const patients = useClinicStore((state) => state.patients);
+  const addPatient = useClinicStore((state) => state.addPatient);
+  const addAppointment = useClinicStore((state) => state.addAppointment);
+  const updatePatientStatus = useClinicStore((state) => state.updatePatientStatus);
+  const getWaitingRoom = useClinicStore((state) => state.getWaitingRoom);
+
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const feedbackTimeoutRef = useRef<number | null>(null);
+  const [walkInFormOpen, setWalkInFormOpen] = useState(false);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const [walkInForm, setWalkInForm] = useState({
+    name: '',
+    phone: '',
+    birth_date: '',
+    insurance_scheme: 'AMO-Achamil' as 'AMO-Achamil' | 'AMO-Tadamon' | 'CNSS-Private',
+    chronic_conditions: '',
+    allergies: '',
+  });
+  const [queueFormOpen, setQueueFormOpen] = useState(false);
+  const [queueForm, setQueueForm] = useState({
+    patient_id: '',
+    notes: '',
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Get waiting room - canonical source of truth for waiting patients
+  // Already sorted by check-in time (earliest first = longest waiting)
+  const waitingAppointments = getWaitingRoom();
+
+  const scheduledAppointments = appointments.filter(
+    (apt) => apt.status === 'scheduled'
+  );
+
+  const todaysAppointments = scheduledAppointments.filter(
+    (appointment) => appointment.date_time.slice(0, 10) === todayKey
+  );
+
+  // The longest waiting patient is the first one in the sorted waiting room
+  const longestWaitingPatientId = waitingAppointments[0]?.patient_id;
+
+  // Sort today's scheduled appointments by time for agenda
+  const todaysAgenda = [...todaysAppointments]
+    .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
+    .slice(0, 4);
+
+  const filteredPatients = patients.filter((patient) => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    return (
+      patient.name.toLowerCase().includes(query) ||
+      patient.amo_id.toLowerCase().includes(query)
+    );
+  });
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getWaitTime = (checkedInAt: string | null) => {
+    if (!checkedInAt) return 0;
+    return Math.floor(
+      (new Date().getTime() - new Date(checkedInAt).getTime()) / 60000
+    );
+  };
+
+  const showFeedback = (message: string) => {
+    if (feedbackTimeoutRef.current) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    setFeedbackMessage(message);
+    feedbackTimeoutRef.current = window.setTimeout(() => {
+      setFeedbackMessage(null);
+      feedbackTimeoutRef.current = null;
+    }, 2200);
+  };
+
+  const handleQuickAction = (label: string) => {
+    console.log(`${label} clicked`);
+    showFeedback(`${label} is ready`);
+  };
+
+  const closeQueueModal = () => {
+    setQueueFormOpen(false);
+    setQueueForm({
+      patient_id: '',
+      notes: '',
+    });
+    setSearchQuery('');
+    setIsDropdownOpen(false);
+  };
+
+  const handleWalkInSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const nextPatientNumber = String(patients.length + 1).padStart(3, '0');
+
+    addPatient({
+      amo_id: `AMO-WALK-2026-${nextPatientNumber}`,
+      name: walkInForm.name.trim(),
+      phone: walkInForm.phone.trim(),
+      birth_date: walkInForm.birth_date,
+      insurance_scheme: walkInForm.insurance_scheme,
+      chronic_conditions: walkInForm.chronic_conditions
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+      allergies: walkInForm.allergies
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    });
+
+    setWalkInFormOpen(false);
+    setWalkInForm({
+      name: '',
+      phone: '',
+      birth_date: '',
+      insurance_scheme: 'AMO-Achamil',
+      chronic_conditions: '',
+      allergies: '',
+    });
+    showFeedback('Walk-in patient registered');
+  };
+
+  const handleQueueExistingSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const selectedPatient = patients.find((patient) => patient.id === queueForm.patient_id);
+
+    if (!selectedPatient) {
+      showFeedback('Select an existing patient first');
+      return;
+    }
+
+    addAppointment({
+      patient_id: selectedPatient.id,
+      date_time: new Date().toISOString(),
+      status: 'waiting',
+      checked_in_at: new Date().toISOString(),
+      notes: queueForm.notes.trim() || 'Patient checked in from registry',
+    });
+
+    setQueueFormOpen(false);
+    setQueueForm({
+      patient_id: '',
+      notes: '',
+    });
+    showFeedback('Existing patient added to waiting room');
+  };
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current) {
+        window.clearTimeout(feedbackTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!feedbackMessage) {
+      return;
+    }
+  }, [feedbackMessage]);
+
+  return (
+    <div className="w-full p-8 bg-slate-50 min-h-screen">
+      {/* Header with Greeting & Quick Actions */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">
+          Good Morning, Dr. Tazi
+        </h1>
+        <p className="text-slate-600">
+          {new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
+
+      {/* Quick Action Buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <button
+          type="button"
+          onClick={() => handleQuickAction('Scan Patient QR')}
+          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-teal-300 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center group-hover:bg-teal-100 transition">
+              <QrCode className="w-5 h-5 text-teal-600" strokeWidth={2} />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-900">Scan Patient QR</p>
+              <p className="text-xs text-slate-500">Quick check-in</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-teal-600 transition" />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setWalkInFormOpen(true)}
+          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-slate-200 transition">
+              <UserPlus className="w-5 h-5 text-slate-600" strokeWidth={2} />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-900">Register Walk-in</p>
+              <p className="text-xs text-slate-500">Add new patient</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-slate-600 transition" />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setQueueFormOpen(true);
+            setQueueForm({
+              patient_id: '',
+              notes: '',
+            });
+            setSearchQuery('');
+            setIsDropdownOpen(false);
+          }}
+          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-slate-200 transition">
+              <FileText className="w-5 h-5 text-slate-600" strokeWidth={2} />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-900">Queue Existing Patient</p>
+              <p className="text-xs text-slate-500">Add registered patient to waiting room</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-slate-600 transition" />
+          </div>
+        </button>
+      </div>
+
+      {feedbackMessage && (
+        <div className="mb-8 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800 shadow-sm">
+          {feedbackMessage}
+        </div>
+      )}
+
+      {walkInFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Register Walk-in Patient</h2>
+                <p className="text-sm text-slate-500">Capture a new patient before adding them to the cabinet flow.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWalkInFormOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleWalkInSubmit} className="grid gap-4 px-6 py-6 md:grid-cols-2">
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Full Name</span>
+                <input
+                  required
+                  value={walkInForm.name}
+                  onChange={(event) => setWalkInForm((current) => ({ ...current, name: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  placeholder="e.g. Khadija El Idrissi"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">Phone</span>
+                <input
+                  required
+                  value={walkInForm.phone}
+                  onChange={(event) => setWalkInForm((current) => ({ ...current, phone: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  placeholder="+212 6 00 00 00 00"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">Birth Date</span>
+                <input
+                  required
+                  type="date"
+                  value={walkInForm.birth_date}
+                  onChange={(event) => setWalkInForm((current) => ({ ...current, birth_date: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                />
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Insurance Scheme</span>
+                <select
+                  value={walkInForm.insurance_scheme}
+                  onChange={(event) =>
+                    setWalkInForm((current) => ({
+                      ...current,
+                      insurance_scheme: event.target.value as 'AMO-Achamil' | 'AMO-Tadamon' | 'CNSS-Private',
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                >
+                  <option value="AMO-Achamil">AMO-Achamil</option>
+                  <option value="AMO-Tadamon">AMO-Tadamon</option>
+                  <option value="CNSS-Private">CNSS-Private</option>
+                </select>
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Chronic Conditions</span>
+                <textarea
+                  value={walkInForm.chronic_conditions}
+                  onChange={(event) => setWalkInForm((current) => ({ ...current, chronic_conditions: event.target.value }))}
+                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  placeholder="Separate with commas"
+                />
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Allergies</span>
+                <textarea
+                  value={walkInForm.allergies}
+                  onChange={(event) => setWalkInForm((current) => ({ ...current, allergies: event.target.value }))}
+                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  placeholder="Separate with commas"
+                />
+              </label>
+
+              <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setWalkInFormOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+                >
+                  Register Patient
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {queueFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Queue Existing Patient</h2>
+                <p className="text-sm text-slate-500">Select a patient who already exists in the registry and add them to the waiting room.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeQueueModal}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleQueueExistingSubmit} className="grid gap-4 px-6 py-6 md:grid-cols-2">
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Existing Patient</span>
+                <div className="relative">
+                  <input
+                    required
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => {
+                      const nextQuery = event.target.value;
+                      setSearchQuery(nextQuery);
+                      setIsDropdownOpen(true);
+                      setQueueForm((current) => ({
+                        ...current,
+                        patient_id: '',
+                      }));
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    placeholder="Search by name or AMO ID..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  />
+
+                  {isDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100">
+                      {filteredPatients.length > 0 ? (
+                        filteredPatients.map((patient) => (
+                          <button
+                            key={patient.id}
+                            type="button"
+                            onClick={() => {
+                              setQueueForm((current) => ({
+                                ...current,
+                                patient_id: patient.id,
+                              }));
+                              setSearchQuery(patient.name);
+                              setIsDropdownOpen(false);
+                            }}
+                            className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50"
+                          >
+                            <span className="text-sm font-semibold text-slate-900">{patient.name}</span>
+                            <span className="text-xs text-slate-500">AMO ID: {patient.amo_id}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-slate-500">
+                          No matching patients found.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {patients.length === 0 && (
+                  <p className="text-xs text-amber-600">No registered patients available. Register one first.</p>
+                )}
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Queue Notes</span>
+                <textarea
+                  value={queueForm.notes}
+                  onChange={(event) => setQueueForm((current) => ({ ...current, notes: event.target.value }))}
+                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  placeholder="Optional triage notes or visit reason"
+                />
+              </label>
+
+              <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <button
+                  type="button"
+                  onClick={closeQueueModal}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+                >
+                  Queue Patient
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Main Bento Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Side - Active Flow (2 columns) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Stats Cards - Smaller & Sleeker */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    Patients
+                  </p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">
+                    {patients.length}
+                  </p>
+                </div>
+                <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" strokeWidth={2} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    Waiting
+                  </p>
+                  <p className="text-2xl font-bold text-orange-600 mt-1">
+                    {waitingAppointments.length}
+                  </p>
+                </div>
+                <div className="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-orange-600" strokeWidth={2} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    Appointments
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+                    {appointments.length}
+                  </p>
+                </div>
+                <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-emerald-600" strokeWidth={2} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Waiting Room - Enhanced */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-5 h-5 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Clock className="w-3 h-3 text-orange-600" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900">Live Waiting Room</h2>
+              <span className="ml-auto text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                {waitingAppointments.length} {waitingAppointments.length === 1 ? 'patient' : 'patients'}
+              </span>
+            </div>
+
+            {waitingAppointments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Clock className="w-6 h-6 text-slate-400" strokeWidth={1.5} />
+                </div>
+                <p className="text-slate-600 font-medium">No patients waiting</p>
+                <p className="text-sm text-slate-400 mt-1">Waiting room is empty</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {waitingAppointments.map((apt, index) => {
+                  const patient = patients.find((p) => p.id === apt.patient_id);
+                  const waitTime = getWaitTime(apt.checked_in_at);
+                  const isLongestWaiting = apt.patient_id === longestWaitingPatientId;
+                  const isOver15Min = waitTime > 15;
+
+                  return (
+                    <div
+                      key={apt.id}
+                      className={`border rounded-lg p-4 transition-all ${
+                        isLongestWaiting
+                          ? 'border-teal-300 bg-teal-50'
+                          : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        {/* Queue & Patient Info */}
+                        <div className="flex items-center gap-3 flex-1">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                              isLongestWaiting
+                                ? 'bg-teal-600 text-white'
+                                : 'bg-orange-100 text-orange-600'
+                            }`}
+                          >
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">
+                              {patient?.name}
+                            </p>
+                            <p className="text-xs text-slate-500">{patient?.amo_id}</p>
+                          </div>
+                        </div>
+
+                        {/* Wait Time */}
+                        <div className="text-right mr-4">
+                          <p className="text-xs font-medium text-slate-500">Wait</p>
+                          <p
+                            className={`text-sm font-bold ${
+                              isOver15Min ? 'text-orange-600' : 'text-slate-900'
+                            }`}
+                          >
+                            {waitTime}m
+                          </p>
+                        </div>
+
+                        {/* Admit Button (for longest waiting) */}
+                        {isLongestWaiting && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!patient || !apt) {
+                                return;
+                              }
+
+                              // Show immediate feedback to user
+                              showFeedback(`Admitting ${patient.name} to exam room...`);
+
+                              // Update appointment status with a small delay for visual feedback
+                              setTimeout(() => {
+                                updatePatientStatus(patient.id, 'in_exam');
+                                console.log(`✓ ${patient.name} (${patient.amo_id}) admitted to exam at ${new Date().toLocaleTimeString()}`);
+                              }, 300);
+                            }}
+                            className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                          >
+                            Admit to Exam
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side - Today's Agenda (1 column) */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 h-fit">
+          <h2 className="text-lg font-bold text-slate-900 mb-6">Today's Agenda</h2>
+
+          {todaysAgenda.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Calendar className="w-5 h-5 text-slate-400" strokeWidth={1.5} />
+              </div>
+              <p className="text-slate-600 font-medium text-sm">No appointments scheduled for today</p>
+              <p className="text-xs text-slate-400 mt-1">Today's agenda is empty</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {todaysAgenda.map((apt) => {
+                const patient = patients.find((p) => p.id === apt.patient_id);
+                const appointmentTime = formatTime(apt.date_time);
+
+                return (
+                  <div
+                    key={apt.id}
+                    className="border-l-3 border-teal-600 pl-4 py-2 relative"
+                  >
+                    {/* Timeline dot */}
+                    <div className="absolute w-3 h-3 bg-teal-600 rounded-full left-[-8.5px] top-[10px]" />
+
+                    <div className="mb-2">
+                      <p className="text-xs font-semibold text-teal-600 uppercase tracking-wide">
+                        {appointmentTime}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-900 mt-1">
+                        {patient?.name}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="inline-block px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
+                        {apt.notes || 'Regular'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* See More Link */}
+          {todaysAppointments.length > 4 && (
+            <button className="mt-6 w-full text-center text-sm font-medium text-teal-600 hover:text-teal-700 py-2 border-t border-slate-200 pt-4">
+              View Full Schedule
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
