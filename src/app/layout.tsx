@@ -4,6 +4,7 @@ import './globals.css';
 import { ReactNode, useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useClinicStore } from '@/store/useClinicStore';
+import { AuthProvider } from '@/context/AuthContext';
 
 /**
  * Global Layout Wrapper
@@ -27,13 +28,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex h-screen bg-slate-50 text-slate-900">
-        {/* Sidebar Navigation */}
-        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <AuthProvider>
+          {/* Sidebar Navigation */}
+          <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          {children}
-        </main>
+          {/* Main Content Area */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            {children}
+          </main>
+        </AuthProvider>
       </body>
     </html>
   );

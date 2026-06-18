@@ -9,14 +9,17 @@
 mod database;
 
 use database::{
+    authenticate_user,
     fetch_appointments,
     fetch_attachments,
     fetch_consultations,
     fetch_patients,
+    fetch_users,
     init_database,
     insert_appointment,
     insert_patient,
     insert_patient_and_queue,
+    insert_user,
     insert_consultation,
     update_patient_status_in_appointments,
     AppointmentRecord,
@@ -26,8 +29,10 @@ use database::{
     ConsultationRecord,
     NewAppointmentInput,
     NewPatientInput,
+    NewUserInput,
     PatientRecord,
     PatientQueueResponse,
+    UserRecord,
 };
 use tauri::State;
 
@@ -60,6 +65,27 @@ async fn get_attachments(state: State<'_, AppState>) -> Result<Vec<AttachmentRec
 }
 
 #[tauri::command]
+async fn login(
+    state: State<'_, AppState>,
+    username: String,
+    password: String,
+) -> Result<UserRecord, String> {
+    authenticate_user(&state.db, &username, &password)
+        .await
+        .map_err(|error| match error {
+            sqlx::Error::RowNotFound => "Invalid username or password".to_string(),
+            other => format!("Failed to authenticate user: {}", other),
+        })
+}
+
+#[tauri::command]
+async fn get_users(state: State<'_, AppState>) -> Result<Vec<UserRecord>, String> {
+    fetch_users(&state.db)
+        .await
+        .map_err(|error| format!("Failed to fetch users: {}", error))
+}
+
+#[tauri::command]
 async fn add_patient(
     state: State<'_, AppState>,
     patient: NewPatientInput,
@@ -88,6 +114,26 @@ async fn add_patient_and_queue(
     insert_patient_and_queue(&state.db, patient, appointment_notes)
         .await
         .map_err(|error| format!("Failed to add patient and queue: {}", error))
+}
+
+#[tauri::command]
+async fn add_user(
+    state: State<'_, AppState>,
+    username: String,
+    password: String,
+    role: String,
+    name: String,
+) -> Result<UserRecord, String> {
+    let user = NewUserInput {
+        username,
+        password,
+        role,
+        name,
+    };
+
+    insert_user(&state.db, user)
+        .await
+        .map_err(|error| format!("Failed to add user: {}", error))
 }
 
 #[tauri::command]
@@ -143,9 +189,12 @@ async fn main() {
             get_appointments,
             get_consultations,
             get_attachments,
+            login,
+            get_users,
             add_patient,
             add_appointment,
             add_patient_and_queue,
+            add_user,
             update_patient_status,
             save_consultation
         ])

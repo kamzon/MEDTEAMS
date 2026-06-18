@@ -12,7 +12,9 @@ import {
   Globe,
   Moon,
   ChevronLeft,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 type UserRole = 'doctor' | 'secretary';
 type Language = 'FR' | 'AR';
@@ -26,6 +28,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [userRole, setUserRole] = useState<UserRole>('doctor');
   const [language, setLanguage] = useState<Language>('FR');
   const pathname = usePathname();
+  const { currentUser, handleLogout } = useAuth();
 
   const isActive = (path: string) => pathname === path;
 
@@ -182,6 +185,19 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               </span>
             </p>
           </div>
+
+          {/* Logout Section */}
+          {currentUser && (
+            <div className="pt-4 border-t border-slate-200">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
+              >
+                <LogOut className="w-4 h-4" strokeWidth={2} />
+                <span>Log Out</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -214,6 +230,19 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               )}
             </button>
           </div>
+
+          {/* Logout Icon - Collapsed State */}
+          {currentUser && (
+            <div className="px-2 py-2 border-t border-slate-200">
+              <button
+                onClick={handleLogout}
+                className="w-full px-2 py-2 hover:bg-red-50 rounded-lg transition-colors"
+                title="Log Out"
+              >
+                <LogOut className="w-5 h-5 text-red-600 mx-auto" strokeWidth={2} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </aside>

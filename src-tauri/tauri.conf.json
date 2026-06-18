@@ -3,21 +3,7 @@
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
     "devPath": "http://localhost:3000",
-    "frontendDist": "../.next"
-  },
-  "app": {
-    "windows": [
-      {
-        "title": "MedTeams",
-        "width": 1400,
-        "height": 900,
-        "resizable": true,
-        "fullscreen": false
-      }
-    ],
-    "security": {
-      "csp": null
-    }
+    "distDir": "../.next"
   },
   "tauri": {
     "allowlist": {

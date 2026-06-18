@@ -109,6 +109,22 @@ pub struct PatientQueueResponse {
     pub appointment: AppointmentRecord,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserRecord {
+    pub id: String,
+    pub username: String,
+    pub role: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewUserInput {
+    pub username: String,
+    pub password: String,
+    pub role: String,
+    pub name: String,
+}
+
 #[derive(Debug, FromRow)]
 struct PatientRow {
     id: String,
@@ -157,6 +173,14 @@ struct AttachmentRow {
     uploaded_at: String,
 }
 
+#[derive(Debug, FromRow)]
+struct UserRow {
+    id: String,
+    username: String,
+    role: String,
+    name: String,
+}
+
 /// Initialize the SQLite database and create tables if they don't exist
 /// 
 /// This function:
@@ -186,6 +210,7 @@ pub async fn init_database() -> Result<DbPool, Box<dyn std::error::Error>> {
 
     // Run migrations (create tables if they don't exist)
     create_tables(&pool).await?;
+    seed_default_users(&pool).await?;
     ensure_patient_cin_column(&pool).await?;
 
     log::info!("Database initialized successfully");
@@ -231,6 +256,99 @@ pub async fn fetch_patients(pool: &DbPool) -> Result<Vec<PatientRecord>, sqlx::E
         .collect();
 
     Ok(patients)
+}
+
+/// Fetch all users from the database without exposing passwords.
+pub async fn fetch_users(pool: &DbPool) -> Result<Vec<UserRecord>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, UserRow>(
+        r#"
+        SELECT
+            id,
+            username,
+            password,
+            role,
+            name
+        FROM users
+        ORDER BY name ASC, username ASC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| UserRecord {
+            id: row.id,
+            username: row.username,
+            role: row.role,
+            name: row.name,
+        })
+        .collect())
+}
+
+/// Authenticate a user using plaintext credentials for the current prototype.
+pub async fn authenticate_user(
+    pool: &DbPool,
+    username: &str,
+    password: &str,
+) -> Result<UserRecord, sqlx::Error> {
+    let row = sqlx::query_as::<_, UserRow>(
+        r#"
+        SELECT
+            id,
+            username,
+            role,
+            name
+        FROM users
+        WHERE username = ? AND password = ?
+        LIMIT 1
+        "#,
+    )
+    .bind(username)
+    .bind(password)
+    .fetch_optional(pool)
+    .await?;
+
+    match row {
+        Some(user) => Ok(UserRecord {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            name: user.name,
+        }),
+        None => Err(sqlx::Error::RowNotFound),
+    }
+}
+
+/// Insert a new user into the users table.
+pub async fn insert_user(pool: &DbPool, user: NewUserInput) -> Result<UserRecord, sqlx::Error> {
+    let user_id = Uuid::new_v4().to_string();
+
+    sqlx::query(
+        r#"
+        INSERT INTO users (
+            id,
+            username,
+            password,
+            role,
+            name
+        ) VALUES (?, ?, ?, ?, ?)
+        "#,
+    )
+    .bind(&user_id)
+    .bind(&user.username)
+    .bind(&user.password)
+    .bind(&user.role)
+    .bind(&user.name)
+    .execute(pool)
+    .await?;
+
+    Ok(UserRecord {
+        id: user_id,
+        username: user.username,
+        role: user.role,
+        name: user.name,
+    })
 }
 
 /// Fetch all appointments from the database.
@@ -496,7 +614,7 @@ pub async fn insert_patient_and_queue(
 
     Ok(PatientQueueResponse {
         patient: PatientRecord {
-            id: patient_id,
+            id: patient_id.clone(),
             amo_id: patient.amo_id,
             name: patient.name,
             cin: patient.cin,
@@ -505,12 +623,12 @@ pub async fn insert_patient_and_queue(
             insurance_scheme: patient.insurance_scheme,
             chronic_conditions: patient.chronic_conditions,
             allergies: patient.allergies,
-            created_at,
+            created_at: created_at.clone(),
         },
         appointment: AppointmentRecord {
             id: appointment_id,
             patient_id,
-            date_time: created_at,
+            date_time: created_at.clone(),
             status: "waiting".to_string(),
             checked_in_at: Some(created_at),
             notes,
@@ -598,6 +716,23 @@ pub async fn insert_consultation(
 
 /// Create all core database tables with proper schema and constraints
 async fn create_tables(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
+    // Create users table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            name TEXT NOT NULL
+        )
+        "#
+    )
+    .execute(pool)
+    .await?;
+
+    log::debug!("Created/verified users table");
+
     // Create patients table
     sqlx::query(
         r#"
@@ -680,6 +815,39 @@ async fn create_tables(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> 
     .await?;
 
     log::debug!("Created/verified attachments table");
+
+    Ok(())
+}
+
+async fn seed_default_users(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
+    let user_count: i64 = sqlx::query_scalar("SELECT COUNT(1) FROM users")
+        .fetch_one(pool)
+        .await?;
+
+    if user_count == 0 {
+        let admin_id = Uuid::new_v4().to_string();
+
+        sqlx::query(
+            r#"
+            INSERT INTO users (
+                id,
+                username,
+                password,
+                role,
+                name
+            ) VALUES (?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&admin_id)
+        .bind("admin")
+        .bind("admin123")
+        .bind("OWNER")
+        .bind("Dr. Tazi")
+        .execute(pool)
+        .await?;
+
+        log::info!("Seeded default admin user");
+    }
 
     Ok(())
 }

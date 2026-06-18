@@ -1,6 +1,5 @@
 'use client';
 
-import { invoke } from '@tauri-apps/api/core';
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -90,8 +89,10 @@ export interface ClinicStore {
   consultations: Consultation[];
   attachments: Attachment[];
   isInitialized: boolean;
+  activeUsername: string | null;
 
   initStore: () => Promise<void>;
+  setActiveUserScope: (username: string | null) => Promise<void>;
 
   addPatient: (patient: PatientInput) => Promise<Patient>;
   addPatientAndQueue: (
@@ -121,56 +122,60 @@ export interface ClinicStore {
   getAttachmentsByPatient: (patientId: string) => Attachment[];
 }
 
-function isTauriRuntime() {
-  return (
-    typeof window !== 'undefined' &&
-    Boolean((window as Window & { __TAURI__?: unknown }).__TAURI__)
-  );
-}
+type StoredClinicState = Pick<ClinicStore, 'patients' | 'appointments' | 'consultations' | 'attachments'>;
 
-const STORE_KEY = 'medteams-clinic-store';
+const AUTH_STORAGE_KEY = 'medteams-active-user';
+const STORE_KEY_PREFIX = 'medteams-clinic-store';
 
-function saveToLocalStorage(patients: Patient[], appointments: Appointment[], consultations: Consultation[], attachments: Attachment[]) {
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(
-        STORE_KEY,
-        JSON.stringify({
-          patients,
-          appointments,
-          consultations,
-          attachments,
-        })
-      );
-    } catch (error) {
-      console.warn('Failed to save store to localStorage:', error);
-    }
-  }
-}
-
-function loadFromLocalStorage() {
+function getActiveUsernameFromStorage() {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    const stored = localStorage.getItem(STORE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!stored) {
+      return null;
     }
-  } catch (error) {
-    console.warn('Failed to load store from localStorage:', error);
-  }
 
-  return null;
+    const parsed = JSON.parse(stored) as { username?: string } | null;
+    return parsed?.username ?? null;
+  } catch {
+    return null;
+  }
 }
 
-async function invokeBackend<T>(command: string, args?: Record<string, unknown>) {
-  if (!isTauriRuntime()) {
-    throw new Error('Tauri IPC is only available inside the desktop shell');
+function getScopedStoreKey(username: string | null) {
+  return `${STORE_KEY_PREFIX}:${username ?? 'anonymous'}`;
+}
+
+function loadScopedStore(username: string | null): StoredClinicState | null {
+  if (typeof window === 'undefined') {
+    return null;
   }
 
-  return invoke<T>(command, args);
+  try {
+    const stored = localStorage.getItem(getScopedStoreKey(username));
+    return stored ? (JSON.parse(stored) as StoredClinicState) : null;
+  } catch (error) {
+    console.warn('Failed to load clinic store from localStorage:', error);
+    return null;
+  }
+}
+
+function saveScopedStore(
+  username: string | null,
+  state: StoredClinicState
+) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    localStorage.setItem(getScopedStoreKey(username), JSON.stringify(state));
+  } catch (error) {
+    console.warn('Failed to save clinic store to localStorage:', error);
+  }
 }
 
 function buildLocalPatient(patient: PatientInput): Patient {
@@ -194,163 +199,90 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
   consultations: [],
   attachments: [],
   isInitialized: false,
+  activeUsername: null,
 
   initStore: async () => {
     if (get().isInitialized) {
       return;
     }
 
-    if (!isTauriRuntime()) {
-      // Load from localStorage if available
-      const stored = loadFromLocalStorage();
-      if (stored) {
-        set({
-          patients: stored.patients,
-          appointments: stored.appointments,
-          consultations: stored.consultations,
-          attachments: stored.attachments,
-          isInitialized: true,
-        });
-      } else {
-        set({ isInitialized: true });
-      }
-      return;
-    }
+    const activeUsername = getActiveUsernameFromStorage();
+    const stored = loadScopedStore(activeUsername);
 
-    try {
-      const [patients, appointments, consultations, attachments] = await Promise.all([
-        invokeBackend<Patient[]>('get_patients'),
-        invokeBackend<Appointment[]>('get_appointments'),
-        invokeBackend<Consultation[]>('get_consultations'),
-        invokeBackend<Attachment[]>('get_attachments'),
-      ]);
+    set({
+      patients: stored?.patients ?? [],
+      appointments: stored?.appointments ?? [],
+      consultations: stored?.consultations ?? [],
+      attachments: stored?.attachments ?? [],
+      isInitialized: true,
+      activeUsername,
+    });
+  },
 
-      set({
-        patients,
-        appointments,
-        consultations,
-        attachments,
-        isInitialized: true,
-      });
-    } catch (error) {
-      console.error('Failed to initialize clinic store from SQLite:', error);
-      set({ isInitialized: true });
-    }
+  setActiveUserScope: async (username) => {
+    const stored = loadScopedStore(username);
+
+    set({
+      patients: stored?.patients ?? [],
+      appointments: stored?.appointments ?? [],
+      consultations: stored?.consultations ?? [],
+      attachments: stored?.attachments ?? [],
+      isInitialized: true,
+      activeUsername: username,
+    });
   },
 
   addPatient: async (patient) => {
-    if (!isTauriRuntime()) {
-      const fallbackPatient = buildLocalPatient(patient);
+    const fallbackPatient = buildLocalPatient(patient);
 
-      set((state) => {
-        const newPatients = [...state.patients, fallbackPatient];
-        saveToLocalStorage(newPatients, state.appointments, state.consultations, state.attachments);
-        return {
-          patients: newPatients,
-        };
+    set((state) => {
+      const newPatients = [...state.patients, fallbackPatient];
+      saveScopedStore(state.activeUsername, {
+        patients: newPatients,
+        appointments: state.appointments,
+        consultations: state.consultations,
+        attachments: state.attachments,
       });
 
-      return fallbackPatient;
-    }
+      return { patients: newPatients };
+    });
 
-    try {
-      const createdPatient = await invokeBackend<Patient>('add_patient', { patient });
-
-      set((state) => ({
-        patients: [...state.patients, createdPatient],
-      }));
-
-      return createdPatient;
-    } catch (error) {
-      console.error('Failed to add patient in backend, falling back to local state:', error);
-      const fallbackPatient = buildLocalPatient(patient);
-
-      set((state) => {
-        const newPatients = [...state.patients, fallbackPatient];
-        saveToLocalStorage(newPatients, state.appointments, state.consultations, state.attachments);
-        return {
-          patients: newPatients,
-        };
-      });
-
-      return fallbackPatient;
-    }
+    return fallbackPatient;
   },
 
   addPatientAndQueue: async (patient, appointmentNotes) => {
-    if (!isTauriRuntime()) {
-      const createdAt = new Date().toISOString();
-      const fallbackPatient: Patient = {
-        ...patient,
-        id: uuidv4(),
-        created_at: createdAt,
-      };
-      const fallbackAppointment: Appointment = {
-        id: uuidv4(),
-        patient_id: fallbackPatient.id,
-        date_time: createdAt,
-        status: 'waiting',
-        checked_in_at: createdAt,
-        notes: appointmentNotes ?? 'New patient intake pending clinical review.',
-      };
+    const createdAt = new Date().toISOString();
+    const fallbackPatient: Patient = {
+      ...patient,
+      id: uuidv4(),
+      created_at: createdAt,
+    };
+    const fallbackAppointment: Appointment = {
+      id: uuidv4(),
+      patient_id: fallbackPatient.id,
+      date_time: createdAt,
+      status: 'waiting',
+      checked_in_at: createdAt,
+      notes: appointmentNotes ?? 'New patient intake pending clinical review.',
+    };
 
-      set((state) => {
-        const newPatients = [...state.patients, fallbackPatient];
-        const newAppointments = [...state.appointments, fallbackAppointment];
-        saveToLocalStorage(newPatients, newAppointments, state.consultations, state.attachments);
-        return {
-          patients: newPatients,
-          appointments: newAppointments,
-        };
+    set((state) => {
+      const newPatients = [...state.patients, fallbackPatient];
+      const newAppointments = [...state.appointments, fallbackAppointment];
+      saveScopedStore(state.activeUsername, {
+        patients: newPatients,
+        appointments: newAppointments,
+        consultations: state.consultations,
+        attachments: state.attachments,
       });
 
-      return { patient: fallbackPatient, appointment: fallbackAppointment };
-    }
-
-    try {
-      const created = await invokeBackend<{ patient: Patient; appointment: Appointment }>(
-        'add_patient_and_queue',
-        {
-          patient,
-          appointmentNotes,
-        }
-      );
-
-      set((state) => ({
-        patients: [...state.patients, created.patient],
-        appointments: [...state.appointments, created.appointment],
-      }));
-
-      return created;
-    } catch (error) {
-      console.error('Failed to queue patient in backend, falling back to local state:', error);
-      const createdAt = new Date().toISOString();
-      const fallbackPatient: Patient = {
-        ...patient,
-        id: uuidv4(),
-        created_at: createdAt,
+      return {
+        patients: newPatients,
+        appointments: newAppointments,
       };
-      const fallbackAppointment: Appointment = {
-        id: uuidv4(),
-        patient_id: fallbackPatient.id,
-        date_time: createdAt,
-        status: 'waiting',
-        checked_in_at: createdAt,
-        notes: appointmentNotes ?? 'New patient intake pending clinical review.',
-      };
+    });
 
-      set((state) => {
-        const newPatients = [...state.patients, fallbackPatient];
-        const newAppointments = [...state.appointments, fallbackAppointment];
-        saveToLocalStorage(newPatients, newAppointments, state.consultations, state.attachments);
-        return {
-          patients: newPatients,
-          appointments: newAppointments,
-        };
-      });
-
-      return { patient: fallbackPatient, appointment: fallbackAppointment };
-    }
+    return { patient: fallbackPatient, appointment: fallbackAppointment };
   },
 
   updatePatient: (id, updates) => {
@@ -358,56 +290,36 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
       const newPatients = state.patients.map((patient) =>
         patient.id === id ? { ...patient, ...updates } : patient
       );
-      if (!isTauriRuntime()) {
-        saveToLocalStorage(newPatients, state.appointments, state.consultations, state.attachments);
-      }
-      return {
+
+      saveScopedStore(state.activeUsername, {
         patients: newPatients,
-      };
+        appointments: state.appointments,
+        consultations: state.consultations,
+        attachments: state.attachments,
+      });
+
+      return { patients: newPatients };
     });
   },
 
   getPatientById: (id) => get().patients.find((patient) => patient.id === id),
 
   addAppointment: async (appointment) => {
-    if (!isTauriRuntime()) {
-      const fallbackAppointment = buildLocalAppointment(appointment);
+    const fallbackAppointment = buildLocalAppointment(appointment);
 
-      set((state) => {
-        const newAppointments = [...state.appointments, fallbackAppointment];
-        saveToLocalStorage(state.patients, newAppointments, state.consultations, state.attachments);
-        return {
-          appointments: newAppointments,
-        };
+    set((state) => {
+      const newAppointments = [...state.appointments, fallbackAppointment];
+      saveScopedStore(state.activeUsername, {
+        patients: state.patients,
+        appointments: newAppointments,
+        consultations: state.consultations,
+        attachments: state.attachments,
       });
 
-      return fallbackAppointment;
-    }
+      return { appointments: newAppointments };
+    });
 
-    try {
-      const createdAppointment = await invokeBackend<Appointment>('add_appointment', {
-        appointment,
-      });
-
-      set((state) => ({
-        appointments: [...state.appointments, createdAppointment],
-      }));
-
-      return createdAppointment;
-    } catch (error) {
-      console.error('Failed to add appointment in backend, falling back to local state:', error);
-      const fallbackAppointment = buildLocalAppointment(appointment);
-
-      set((state) => {
-        const newAppointments = [...state.appointments, fallbackAppointment];
-        saveToLocalStorage(state.patients, newAppointments, state.consultations, state.attachments);
-        return {
-          appointments: newAppointments,
-        };
-      });
-
-      return fallbackAppointment;
-    }
+    return fallbackAppointment;
   },
 
   updateAppointmentStatus: (appointmentId, status) => {
@@ -424,38 +336,29 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
             }
           : appointment
       );
-      if (!isTauriRuntime()) {
-        saveToLocalStorage(state.patients, newAppointments, state.consultations, state.attachments);
-      }
-      return {
+
+      saveScopedStore(state.activeUsername, {
+        patients: state.patients,
         appointments: newAppointments,
-      };
+        consultations: state.consultations,
+        attachments: state.attachments,
+      });
+
+      return { appointments: newAppointments };
     });
   },
 
   updatePatientStatus: async (patientId, status) => {
-    if (isTauriRuntime()) {
-      try {
-        await invokeBackend<number>('update_patient_status', {
-          patientId,
-          status,
-        });
-      } catch (error) {
-        console.error('Failed to update patient status in backend, falling back to local state:', error);
-      }
-    }
-
-    let appointmentUpdated = false;
-
     set((state) => {
+      let appointmentUpdated = false;
+
       const newAppointments = state.appointments.map((appointment) => {
         if (
           !appointmentUpdated &&
           appointment.patient_id === patientId &&
-          (appointment.status === 'waiting' || appointment.status === 'scheduled')
+          (appointment.status === 'scheduled' || appointment.status === 'waiting' || appointment.status === 'in_exam' || appointment.status === 'billing')
         ) {
           appointmentUpdated = true;
-
           return {
             ...appointment,
             status,
@@ -468,14 +371,15 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
         return appointment;
       });
-      
-      if (!isTauriRuntime()) {
-        saveToLocalStorage(state.patients, newAppointments, state.consultations, state.attachments);
-      }
-      
-      return {
+
+      saveScopedStore(state.activeUsername, {
+        patients: state.patients,
         appointments: newAppointments,
-      };
+        consultations: state.consultations,
+        attachments: state.attachments,
+      });
+
+      return { appointments: newAppointments };
     });
   },
 
@@ -495,55 +399,24 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
       }),
 
   addConsultationNote: async (consultation) => {
-    if (!isTauriRuntime()) {
-      const fallbackConsultation: Consultation = {
-        ...consultation,
-        id: uuidv4(),
-      };
+    const fallbackConsultation: Consultation = {
+      ...consultation,
+      id: uuidv4(),
+    };
 
-      set((state) => {
-        const newConsultations = [...state.consultations, fallbackConsultation];
-        saveToLocalStorage(state.patients, state.appointments, newConsultations, state.attachments);
-        return {
-          consultations: newConsultations,
-        };
+    set((state) => {
+      const newConsultations = [...state.consultations, fallbackConsultation];
+      saveScopedStore(state.activeUsername, {
+        patients: state.patients,
+        appointments: state.appointments,
+        consultations: newConsultations,
+        attachments: state.attachments,
       });
 
-      return fallbackConsultation;
-    }
+      return { consultations: newConsultations };
+    });
 
-    try {
-      const consultationId = await invokeBackend<string>('save_consultation', {
-        consultation,
-      });
-
-      const createdConsultation: Consultation = {
-        ...consultation,
-        id: consultationId,
-      };
-
-      set((state) => ({
-        consultations: [...state.consultations, createdConsultation],
-      }));
-
-      return createdConsultation;
-    } catch (error) {
-      console.error('Failed to save consultation in backend, falling back to local state:', error);
-      const fallbackConsultation: Consultation = {
-        ...consultation,
-        id: uuidv4(),
-      };
-
-      set((state) => {
-        const newConsultations = [...state.consultations, fallbackConsultation];
-        saveToLocalStorage(state.patients, state.appointments, newConsultations, state.attachments);
-        return {
-          consultations: newConsultations,
-        };
-      });
-
-      return fallbackConsultation;
-    }
+    return fallbackConsultation;
   },
 
   getConsultationsByPatient: (patientId) =>
@@ -558,12 +431,14 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
     set((state) => {
       const newAttachments = [...state.attachments, newAttachment];
-      if (!isTauriRuntime()) {
-        saveToLocalStorage(state.patients, state.appointments, state.consultations, newAttachments);
-      }
-      return {
+      saveScopedStore(state.activeUsername, {
+        patients: state.patients,
+        appointments: state.appointments,
+        consultations: state.consultations,
         attachments: newAttachments,
-      };
+      });
+
+      return { attachments: newAttachments };
     });
   },
 

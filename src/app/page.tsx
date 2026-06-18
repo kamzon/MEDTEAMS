@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useClinicStore } from '../store/useClinicStore';
+import { useAuth } from '@/context/AuthContext';
 import {
   Users,
   Clock,
@@ -14,7 +15,139 @@ import {
   ClipboardCheck,
 } from 'lucide-react';
 
+type SessionUser = {
+  id: string;
+  username: string;
+  role: string;
+  name: string;
+};
+
+type StoredAuthUser = SessionUser & {
+  password: string;
+};
+
+const AUTH_STORAGE_KEY = 'medteams-active-user';
+const USERS_STORAGE_KEY = 'medteams-auth-users';
+const DEFAULT_LOCAL_USERS: StoredAuthUser[] = [
+  {
+    id: 'local-admin',
+    username: 'admin',
+    password: 'admin123',
+    role: 'OWNER',
+    name: 'Dr. Tazi',
+  },
+];
+
+function isTauriRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const tauriWindow = window as Window & {
+    __TAURI__?: {
+      invoke?: unknown;
+      core?: {
+        invoke?: unknown;
+      };
+    };
+  };
+
+  return Boolean(tauriWindow.__TAURI__?.invoke || tauriWindow.__TAURI__?.core?.invoke);
+}
+
+function loadLocalUsers(): StoredAuthUser[] {
+  if (typeof window === 'undefined') {
+    return DEFAULT_LOCAL_USERS;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(USERS_STORAGE_KEY);
+    if (!stored) {
+      window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_LOCAL_USERS));
+      return DEFAULT_LOCAL_USERS;
+    }
+
+    const parsed = JSON.parse(stored) as StoredAuthUser[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_LOCAL_USERS));
+      return DEFAULT_LOCAL_USERS;
+    }
+
+    return parsed;
+  } catch {
+    window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_LOCAL_USERS));
+    return DEFAULT_LOCAL_USERS;
+  }
+}
+
+function saveLocalUsers(users: StoredAuthUser[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+}
+
+function loginLocalUser(username: string, password: string) {
+  const users = loadLocalUsers();
+  const match = users.find(
+    (user) => user.username.toLowerCase() === username.toLowerCase() && user.password === password
+  );
+
+  if (!match) {
+    throw new Error('Invalid username or password');
+  }
+
+  const { password: _password, ...sessionUser } = match;
+  return sessionUser;
+}
+
+function addLocalUser(user: Omit<StoredAuthUser, 'id'>) {
+  const users = loadLocalUsers();
+  const usernameExists = users.some(
+    (existingUser) => existingUser.username.toLowerCase() === user.username.toLowerCase()
+  );
+
+  if (usernameExists) {
+    throw new Error('Username already exists');
+  }
+
+  const createdUser: StoredAuthUser = {
+    id: `local-${Date.now()}`,
+    ...user,
+  };
+
+  saveLocalUsers([...users, createdUser]);
+
+  const { password: _password, ...sessionUser } = createdUser;
+  return sessionUser;
+}
+
+async function invokeTauriCommand<T>(command: string, args?: Record<string, unknown>) {
+  if (typeof window === 'undefined') {
+    throw new Error('Tauri commands are only available in the browser runtime');
+  }
+
+  const tauriWindow = window as Window & {
+    __TAURI__?: {
+      invoke?: <Result>(command: string, args?: Record<string, unknown>) => Promise<Result>;
+      core?: {
+        invoke?: <Result>(command: string, args?: Record<string, unknown>) => Promise<Result>;
+      };
+    };
+  };
+
+  const invoke = tauriWindow.__TAURI__?.invoke ?? tauriWindow.__TAURI__?.core?.invoke;
+
+  if (!invoke) {
+    throw new Error('Tauri IPC is unavailable');
+  }
+
+  return invoke<T>(command, args);
+}
+
 export default function DashboardPage() {
+  const { currentUser, setCurrentUser } = useAuth();
   const appointments = useClinicStore((state) => state.appointments);
   const consultations = useClinicStore((state) => state.consultations);
   const patients = useClinicStore((state) => state.patients);
@@ -42,6 +175,19 @@ export default function DashboardPage() {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loginForm, setLoginForm] = useState({
+    username: '',
+    password: '',
+  });
+  const [doctorForm, setDoctorForm] = useState({
+    name: '',
+    username: '',
+    password: '',
+  });
 
   // Get waiting room - canonical source of truth for waiting patients
   // Already sorted by check-in time (earliest first = longest waiting)
@@ -198,6 +344,61 @@ export default function DashboardPage() {
     setIsDropdownOpen(false);
   };
 
+  const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const authenticatedUser = isTauriRuntime()
+        ? await invokeTauriCommand<SessionUser>('login', {
+            username: loginForm.username.trim(),
+            password: loginForm.password,
+          })
+        : loginLocalUser(loginForm.username.trim(), loginForm.password);
+
+      setCurrentUser(authenticatedUser);
+      setLoginForm({ username: '', password: '' });
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleDoctorRegistration = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const authenticatedUser = isTauriRuntime()
+        ? (await invokeTauriCommand<SessionUser>('add_user', {
+            username: doctorForm.username.trim(),
+            password: doctorForm.password,
+            role: 'DOCTOR',
+            name: doctorForm.name.trim(),
+          })) &&
+          (await invokeTauriCommand<SessionUser>('login', {
+            username: doctorForm.username.trim(),
+            password: doctorForm.password,
+          }))
+        : addLocalUser({
+            username: doctorForm.username.trim(),
+            password: doctorForm.password,
+            role: 'DOCTOR',
+            name: doctorForm.name.trim(),
+          });
+
+      setCurrentUser(authenticatedUser);
+      setDoctorForm({ name: '', username: '', password: '' });
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Failed to create doctor account');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleWalkInSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -258,11 +459,21 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    return () => {
-      if (feedbackTimeoutRef.current) {
-        window.clearTimeout(feedbackTimeoutRef.current);
+    if (typeof window !== 'undefined') {
+      try {
+        const storedUser = window.localStorage.getItem(AUTH_STORAGE_KEY);
+        if (storedUser) {
+          setCurrentUser(JSON.parse(storedUser) as SessionUser);
+        }
+
+        loadLocalUsers();
+      } catch {
+        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+        window.localStorage.removeItem(USERS_STORAGE_KEY);
       }
-    };
+    }
+
+    setAuthReady(true);
   }, []);
 
   useEffect(() => {
@@ -271,21 +482,189 @@ export default function DashboardPage() {
     }
   }, [feedbackMessage]);
 
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current) {
+        window.clearTimeout(feedbackTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  if (!authReady) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 text-sm font-medium text-slate-600 shadow-2xl">
+          Loading secure workspace...
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-4 text-slate-100">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.18),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(148,163,184,0.16),transparent_35%)]" />
+
+        <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-white/95 shadow-2xl backdrop-blur">
+          <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="bg-slate-950 px-8 py-10 text-slate-100">
+              <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-teal-200">
+                MedTeams Secure Access
+              </div>
+              <h1 className="mt-6 text-4xl font-bold tracking-tight text-white">
+                Create a doctor account and sign into the clinical workspace.
+              </h1>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">
+                Start with a local doctor profile, then authenticate to unlock the dashboard, calendar, and patient workflows.
+              </p>
+
+              <div className="mt-8 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Quick test account</p>
+                <div className="grid gap-2 text-sm text-slate-200">
+                  <div><span className="text-slate-400">Username:</span> admin</div>
+                  <div><span className="text-slate-400">Password:</span> admin123</div>
+                  <div><span className="text-slate-400">Role:</span> OWNER</div>
+                </div>
+                  <p className="text-xs leading-5 text-slate-400">
+                    In browser dev mode, new doctor accounts are stored locally in your browser.
+                  </p>
+              </div>
+            </div>
+
+            <div className="bg-white px-8 py-10 text-slate-900">
+              <div className="flex items-center gap-2 rounded-full bg-slate-100 p-1 text-sm font-semibold text-slate-500">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('register')}
+                  className={`flex-1 rounded-full px-4 py-2 transition-colors ${
+                    authMode === 'register' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-800'
+                  }`}
+                >
+                  Create Doctor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('login')}
+                  className={`flex-1 rounded-full px-4 py-2 transition-colors ${
+                    authMode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-800'
+                  }`}
+                >
+                  Sign In
+                </button>
+              </div>
+
+              {authError && (
+                <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {authError}
+                </div>
+              )}
+
+              {authMode === 'register' ? (
+                <form onSubmit={handleDoctorRegistration} className="mt-6 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Doctor Name</label>
+                    <input
+                      required
+                      value={doctorForm.name}
+                      onChange={(event) => setDoctorForm((current) => ({ ...current, name: event.target.value }))}
+                      placeholder="Dr. Khadija Tazi"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Username</label>
+                    <input
+                      required
+                      value={doctorForm.username}
+                      onChange={(event) => setDoctorForm((current) => ({ ...current, username: event.target.value }))}
+                      placeholder="dr.khadija"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Password</label>
+                    <input
+                      required
+                      type="password"
+                      value={doctorForm.password}
+                      onChange={(event) => setDoctorForm((current) => ({ ...current, password: event.target.value }))}
+                      placeholder="Create a password"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full rounded-xl bg-teal-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {authLoading ? 'Creating doctor...' : 'Create Doctor & Sign In'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Username</label>
+                    <input
+                      required
+                      value={loginForm.username}
+                      onChange={(event) => setLoginForm((current) => ({ ...current, username: event.target.value }))}
+                      placeholder="admin"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Password</label>
+                    <input
+                      required
+                      type="password"
+                      value={loginForm.password}
+                      onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+                      placeholder="admin123"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {authLoading ? 'Signing in...' : 'Sign In'}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full p-8 bg-slate-50 min-h-screen">
       {/* Header with Greeting & Quick Actions */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">
-          Good Morning, Dr. Tazi
-        </h1>
-        <p className="text-slate-600">
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </p>
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-1">
+            Good Morning, {currentUser?.name ?? 'Doctor'}
+          </h1>
+          <p className="text-slate-600">
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </p>
+        </div>
+
+        {currentUser && (
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="text-right">
+              <p className="text-sm font-semibold text-slate-900">{currentUser?.name}</p>
+              <p className="text-xs text-slate-500">{currentUser?.role}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Action Buttons */}
