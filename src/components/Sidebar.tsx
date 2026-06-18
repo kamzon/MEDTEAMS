@@ -13,6 +13,7 @@ import {
   Moon,
   ChevronLeft,
   LogOut,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -36,6 +37,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { label: 'Dashboard', path: '/', icon: Home },
     { label: 'Calendar', path: '/calendar', icon: Calendar },
     { label: 'Patients', path: '/patients', icon: Users },
+    { label: 'Settings', path: '/settings', icon: Settings },
   ];
 
   return (
