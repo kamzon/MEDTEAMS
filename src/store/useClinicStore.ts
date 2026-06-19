@@ -204,6 +204,16 @@ function normalizeAppointment(
   };
 }
 
+function dedupeAppointments(appointments: Appointment[]) {
+  const uniqueAppointments = new Map<string, Appointment>();
+
+  appointments.forEach((appointment) => {
+    uniqueAppointments.set(appointment.id, appointment);
+  });
+
+  return Array.from(uniqueAppointments.values());
+}
+
 function loadSharedAppointments(): Appointment[] {
   if (typeof window === 'undefined') {
     return [];
@@ -214,11 +224,11 @@ function loadSharedAppointments(): Appointment[] {
     if (stored) {
       const parsed = JSON.parse(stored) as Appointment[];
       return Array.isArray(parsed)
-        ? parsed.map((appointment) => ({
+        ? dedupeAppointments(parsed.map((appointment) => ({
             ...appointment,
             patient_name: appointment.patient_name ?? 'Unknown patient',
             owner_username: appointment.owner_username ?? 'shared',
-          }))
+          })))
         : [];
     }
 
@@ -254,8 +264,9 @@ function loadSharedAppointments(): Appointment[] {
       }
     }
 
-    localStorage.setItem(SHARED_APPOINTMENTS_KEY, JSON.stringify(mergedAppointments));
-    return mergedAppointments;
+    const dedupedAppointments = dedupeAppointments(mergedAppointments);
+    localStorage.setItem(SHARED_APPOINTMENTS_KEY, JSON.stringify(dedupedAppointments));
+    return dedupedAppointments;
   } catch (error) {
     console.warn('Failed to load shared appointments from localStorage:', error);
     return [];
@@ -268,7 +279,7 @@ function saveSharedAppointments(appointments: Appointment[]) {
   }
 
   try {
-    localStorage.setItem(SHARED_APPOINTMENTS_KEY, JSON.stringify(appointments));
+    localStorage.setItem(SHARED_APPOINTMENTS_KEY, JSON.stringify(dedupeAppointments(appointments)));
   } catch (error) {
     console.warn('Failed to save shared appointments to localStorage:', error);
   }
@@ -369,7 +380,7 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
     set((state) => {
       const newPatients = [...state.patients, fallbackPatient];
-      const newAppointments = [...state.appointments, fallbackAppointment];
+      const newAppointments = dedupeAppointments([...state.appointments, fallbackAppointment]);
       saveSharedAppointments(newAppointments);
       saveScopedStore(state.activeUsername, {
         patients: newPatients,
@@ -408,7 +419,7 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
     const fallbackAppointment = buildLocalAppointment(appointment, get().activeUsername ?? '');
 
     set((state) => {
-      const newAppointments = [...state.appointments, fallbackAppointment];
+      const newAppointments = dedupeAppointments([...state.appointments, fallbackAppointment]);
       saveSharedAppointments(newAppointments);
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
@@ -437,14 +448,16 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
           : appointment
       );
 
-      saveSharedAppointments(newAppointments);
+      const dedupedAppointments = dedupeAppointments(newAppointments);
+
+      saveSharedAppointments(dedupedAppointments);
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
         consultations: state.consultations,
         attachments: state.attachments,
       });
 
-      return { appointments: newAppointments };
+      return { appointments: dedupedAppointments };
     });
   },
 
@@ -472,14 +485,16 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
         return appointment;
       });
 
-      saveSharedAppointments(newAppointments);
+      const dedupedAppointments = dedupeAppointments(newAppointments);
+
+      saveSharedAppointments(dedupedAppointments);
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
         consultations: state.consultations,
         attachments: state.attachments,
       });
 
-      return { appointments: newAppointments };
+      return { appointments: dedupedAppointments };
     });
   },
 

@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useClinicStore } from '../store/useClinicStore';
 import { useAuth } from '@/context/AuthContext';
 import { addLocalUser, loginLocalUser, loadLocalUsers, USERS_STORAGE_KEY } from '@/lib/localUsers';
+import { useAppSettingsStore } from '@/store/useAppSettingsStore';
 import {
   Users,
   Clock,
@@ -67,6 +68,7 @@ async function invokeTauriCommand<T>(command: string, args?: Record<string, unkn
 
 export default function DashboardPage() {
   const { currentUser, setCurrentUser } = useAuth();
+  const language = useAppSettingsStore((state) => state.language);
   const appointments = useClinicStore((state) => state.appointments);
   const consultations = useClinicStore((state) => state.consultations);
   const patients = useClinicStore((state) => state.patients);
@@ -107,6 +109,59 @@ export default function DashboardPage() {
     username: '',
     password: '',
   });
+  const isFrench = language === 'FR';
+  const ui = {
+    walkInSaved: isFrench ? 'Patient sans rendez-vous enregistré' : 'Walk-in patient registered',
+    selectExistingFirst: isFrench ? 'Sélectionnez d’abord un patient existant' : 'Select an existing patient first',
+    queueSaved: isFrench ? 'Patient existant ajouté à la salle d’attente' : 'Existing patient added to waiting room',
+    registerWalkInTitle: isFrench ? 'Enregistrer un patient sans rendez-vous' : 'Register Walk-in Patient',
+    registerWalkInSubtitle: isFrench
+      ? 'Enregistrer un nouveau patient avant de l’intégrer au flux du cabinet.'
+      : 'Capture a new patient before adding them to the cabinet flow.',
+    close: isFrench ? 'Fermer' : 'Close',
+    fullName: isFrench ? 'Nom complet' : 'Full Name',
+    phone: isFrench ? 'Téléphone' : 'Phone',
+    birthDate: isFrench ? 'Date de naissance' : 'Birth Date',
+    insuranceScheme: isFrench ? 'Régime d’assurance' : 'Insurance Scheme',
+    chronicConditions: isFrench ? 'Pathologies chroniques' : 'Chronic Conditions',
+    allergies: isFrench ? 'Allergies' : 'Allergies',
+    separateWithCommas: isFrench ? 'Séparez par des virgules' : 'Separate with commas',
+    cancel: isFrench ? 'Annuler' : 'Cancel',
+    registerPatient: isFrench ? 'Enregistrer le patient' : 'Register Patient',
+    queueTitle: isFrench ? 'Ajouter un patient existant' : 'Queue Existing Patient',
+    queueSubtitle: isFrench ? 'Ajouter un patient enregistré à la salle d’attente' : 'Add registered patient to waiting room',
+    existingPatient: isFrench ? 'Patient existant' : 'Existing Patient',
+    searchPlaceholder: isFrench ? 'Rechercher par nom ou identifiant AMO...' : 'Search by name or AMO ID...',
+    noMatchingPatients: isFrench ? 'Aucun patient correspondant.' : 'No matching patients found.',
+    noRegisteredPatients: isFrench ? 'Aucun patient enregistré disponible. Enregistrez-en un d’abord.' : 'No registered patients available. Register one first.',
+    queueNotes: isFrench ? 'Notes de file d’attente' : 'Queue Notes',
+    queueNotesPlaceholder: isFrench ? 'Notes de triage ou motif de visite' : 'Optional triage notes or visit reason',
+    queuePatient: isFrench ? 'Mettre en file d’attente' : 'Queue Patient',
+    patients: isFrench ? 'Patients' : 'Patients',
+    waiting: isFrench ? 'En attente' : 'Waiting',
+    appointments: isFrench ? 'Rendez-vous' : 'Appointments',
+    liveWaitingRoom: isFrench ? 'Salle d’attente en direct' : 'Live Waiting Room',
+    patientCount: (count: number) => (isFrench ? `${count} ${count === 1 ? 'patient' : 'patients'}` : `${count} ${count === 1 ? 'patient' : 'patients'}`),
+    noPatientsWaiting: isFrench ? 'Aucun patient en attente' : 'No patients waiting',
+    waitingRoomEmpty: isFrench ? 'La salle d’attente est vide' : 'Waiting room is empty',
+    wait: isFrench ? 'Attente' : 'Wait',
+    admitToExam: isFrench ? 'Admettre en examen' : 'Admit to Exam',
+    completedToday: isFrench ? 'Terminés aujourd’hui' : 'Completed Today',
+    caseCount: (count: number) => (isFrench ? `${count} cas` : `${count} ${count === 1 ? 'case' : 'cases'}`),
+    noCompletedExams: isFrench ? 'Aucune consultation terminée pour le moment' : 'No completed examinations yet',
+    completedAppearsHere: isFrench
+      ? 'Les consultations terminées apparaîtront ici une fois marquées comme terminées.'
+      : 'Finished consults will appear here once they are marked complete.',
+    prescriptionIssued: isFrench ? 'Ordonnance émise' : 'Prescription Issued',
+    noMedication: isFrench ? 'Aucun médicament' : 'No Medication',
+    todayAgenda: isFrench ? 'Agenda du jour' : "Today's Agenda",
+    noAppointmentsToday: isFrench ? 'Aucun rendez-vous prévu pour aujourd’hui' : 'No appointments scheduled for today',
+    todayAgendaEmpty: isFrench ? "L'agenda d'aujourd'hui est vide" : "Today's agenda is empty",
+    regular: isFrench ? 'Régulier' : 'Regular',
+    viewFullSchedule: isFrench ? 'Voir tout l’agenda' : 'View Full Schedule',
+    you: isFrench ? 'Vous' : 'You',
+    unknownPatient: isFrench ? 'Patient inconnu' : 'Unknown patient',
+  };
 
   // Get waiting room - canonical source of truth for waiting patients
   // Already sorted by check-in time (earliest first = longest waiting)
@@ -348,7 +403,7 @@ export default function DashboardPage() {
       chronic_conditions: '',
       allergies: '',
     });
-    showFeedback('Walk-in patient registered');
+    showFeedback(ui.walkInSaved);
   };
 
   const handleQueueExistingSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -357,7 +412,7 @@ export default function DashboardPage() {
     const selectedPatient = patients.find((patient) => patient.id === queueForm.patient_id);
 
     if (!selectedPatient) {
-      showFeedback('Select an existing patient first');
+      showFeedback(ui.selectExistingFirst);
       return;
     }
 
@@ -368,7 +423,7 @@ export default function DashboardPage() {
       date_time: new Date().toISOString(),
       status: 'waiting',
       checked_in_at: new Date().toISOString(),
-      notes: queueForm.notes.trim() || 'Patient checked in from registry',
+      notes: queueForm.notes.trim() || (isFrench ? 'Patient enregistré depuis le registre' : 'Patient checked in from registry'),
     });
 
     setQueueFormOpen(false);
@@ -376,7 +431,7 @@ export default function DashboardPage() {
       patient_id: '',
       notes: '',
     });
-    showFeedback('Existing patient added to waiting room');
+    showFeedback(ui.queueSaved);
   };
 
   useEffect(() => {
@@ -415,7 +470,7 @@ export default function DashboardPage() {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 text-sm font-medium text-slate-600 shadow-2xl">
-          Loading secure workspace...
+          {isFrench ? 'Chargement de l’espace sécurisé...' : 'Loading secure workspace...'}
         </div>
       </div>
     );
@@ -430,24 +485,32 @@ export default function DashboardPage() {
           <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="bg-slate-950 px-8 py-10 text-slate-100">
               <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-teal-200">
-                MedTeams Secure Access
+                {isFrench ? 'Accès sécurisé MedTeams' : 'MedTeams Secure Access'}
               </div>
               <h1 className="mt-6 text-4xl font-bold tracking-tight text-white">
-                Create a doctor account and sign into the clinical workspace.
+                {isFrench
+                  ? 'Créez un compte médecin et connectez-vous à l’espace clinique.'
+                  : 'Create a doctor account and sign into the clinical workspace.'}
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">
-                Start with a local doctor profile, then authenticate to unlock the dashboard, calendar, and patient workflows.
+                {isFrench
+                  ? 'Commencez avec un profil médecin local, puis authentifiez-vous pour accéder au tableau de bord, au calendrier et aux patients.'
+                  : 'Start with a local doctor profile, then authenticate to unlock the dashboard, calendar, and patient workflows.'}
               </p>
 
               <div className="mt-8 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Quick test account</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">
+                  {isFrench ? 'Compte de test rapide' : 'Quick test account'}
+                </p>
                 <div className="grid gap-2 text-sm text-slate-200">
                   <div><span className="text-slate-400">Username:</span> admin</div>
                   <div><span className="text-slate-400">Password:</span> admin123</div>
-                  <div><span className="text-slate-400">Role:</span> OWNER</div>
+                  <div><span className="text-slate-400">{isFrench ? 'Rôle' : 'Role'}:</span> OWNER</div>
                 </div>
                   <p className="text-xs leading-5 text-slate-400">
-                    In browser dev mode, new doctor accounts are stored locally in your browser.
+                    {isFrench
+                      ? 'En mode navigateur, les nouveaux comptes médecins sont enregistrés localement.'
+                      : 'In browser dev mode, new doctor accounts are stored locally in your browser.'}
                   </p>
               </div>
             </div>
@@ -461,7 +524,7 @@ export default function DashboardPage() {
                     authMode === 'register' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-800'
                   }`}
                 >
-                  Create Doctor
+                  {isFrench ? 'Créer un médecin' : 'Create Doctor'}
                 </button>
                 <button
                   type="button"
@@ -470,7 +533,7 @@ export default function DashboardPage() {
                     authMode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-800'
                   }`}
                 >
-                  Sign In
+                  {isFrench ? 'Connexion' : 'Sign In'}
                 </button>
               </div>
 
@@ -483,7 +546,7 @@ export default function DashboardPage() {
               {authMode === 'register' ? (
                 <form onSubmit={handleDoctorRegistration} className="mt-6 space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Doctor Name</label>
+                    <label className="text-sm font-medium text-slate-700">{isFrench ? 'Nom du médecin' : 'Doctor Name'}</label>
                     <input
                       required
                       value={doctorForm.name}
@@ -493,7 +556,7 @@ export default function DashboardPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Username</label>
+                    <label className="text-sm font-medium text-slate-700">{isFrench ? 'Nom d’utilisateur' : 'Username'}</label>
                     <input
                       required
                       value={doctorForm.username}
@@ -503,13 +566,13 @@ export default function DashboardPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Password</label>
+                    <label className="text-sm font-medium text-slate-700">{isFrench ? 'Mot de passe' : 'Password'}</label>
                     <input
                       required
                       type="password"
                       value={doctorForm.password}
                       onChange={(event) => setDoctorForm((current) => ({ ...current, password: event.target.value }))}
-                      placeholder="Create a password"
+                      placeholder={isFrench ? 'Créez un mot de passe' : 'Create a password'}
                       className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
                     />
                   </div>
@@ -518,13 +581,13 @@ export default function DashboardPage() {
                     disabled={authLoading}
                     className="w-full rounded-xl bg-teal-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {authLoading ? 'Creating doctor...' : 'Create Doctor & Sign In'}
+                    {authLoading ? (isFrench ? 'Création en cours...' : 'Creating doctor...') : isFrench ? 'Créer le compte médecin' : 'Create Doctor & Sign In'}
                   </button>
                 </form>
               ) : (
                 <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Username</label>
+                    <label className="text-sm font-medium text-slate-700">{isFrench ? 'Nom d’utilisateur' : 'Username'}</label>
                     <input
                       required
                       value={loginForm.username}
@@ -534,7 +597,7 @@ export default function DashboardPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Password</label>
+                    <label className="text-sm font-medium text-slate-700">{isFrench ? 'Mot de passe' : 'Password'}</label>
                     <input
                       required
                       type="password"
@@ -549,7 +612,7 @@ export default function DashboardPage() {
                     disabled={authLoading}
                     className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {authLoading ? 'Signing in...' : 'Sign In'}
+                    {authLoading ? (isFrench ? 'Connexion...' : 'Signing in...') : isFrench ? 'Connexion' : 'Sign In'}
                   </button>
                 </form>
               )}
@@ -566,10 +629,10 @@ export default function DashboardPage() {
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-1">
-            Good Morning, {currentUser?.name ?? 'Doctor'}
+            {isFrench ? 'Bonjour' : 'Good Morning'}, {currentUser?.name ?? (isFrench ? 'Docteur' : 'Doctor')}
           </h1>
           <p className="text-slate-600">
-            {new Date().toLocaleDateString('en-US', {
+            {new Date().toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
@@ -582,7 +645,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div className="text-right">
               <p className="text-sm font-semibold text-slate-900">{currentUser?.name}</p>
-              <p className="text-xs text-slate-500">{currentUser?.role}</p>
+              <p className="text-xs text-slate-500">{isFrench ? 'Rôle' : 'Role'}: {currentUser?.role}</p>
             </div>
           </div>
         )}
@@ -592,7 +655,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <button
           type="button"
-          onClick={() => handleQuickAction('Scan Patient QR')}
+          onClick={() => handleQuickAction(isFrench ? 'Scanner le QR patient' : 'Scan Patient QR')}
           className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-teal-300 transition-all group"
         >
           <div className="flex items-center gap-3">
@@ -600,8 +663,8 @@ export default function DashboardPage() {
               <QrCode className="w-5 h-5 text-teal-600" strokeWidth={2} />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-slate-900">Scan Patient QR</p>
-              <p className="text-xs text-slate-500">Quick check-in</p>
+              <p className="text-sm font-semibold text-slate-900">{isFrench ? 'Scanner le QR patient' : 'Scan Patient QR'}</p>
+              <p className="text-xs text-slate-500">{isFrench ? 'Enregistrement rapide' : 'Quick check-in'}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-teal-600 transition" />
           </div>
@@ -617,8 +680,8 @@ export default function DashboardPage() {
               <UserPlus className="w-5 h-5 text-slate-600" strokeWidth={2} />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-slate-900">Register Walk-in</p>
-              <p className="text-xs text-slate-500">Add new patient</p>
+              <p className="text-sm font-semibold text-slate-900">{isFrench ? 'Enregistrer une entrée' : 'Register Walk-in'}</p>
+              <p className="text-xs text-slate-500">{isFrench ? 'Ajouter un nouveau patient' : 'Add new patient'}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-slate-600 transition" />
           </div>
@@ -642,8 +705,8 @@ export default function DashboardPage() {
               <FileText className="w-5 h-5 text-slate-600" strokeWidth={2} />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-slate-900">Queue Existing Patient</p>
-              <p className="text-xs text-slate-500">Add registered patient to waiting room</p>
+              <p className="text-sm font-semibold text-slate-900">{ui.queueTitle}</p>
+              <p className="text-xs text-slate-500">{ui.queueSubtitle}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-slate-600 transition" />
           </div>
@@ -661,32 +724,32 @@ export default function DashboardPage() {
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Register Walk-in Patient</h2>
-                <p className="text-sm text-slate-500">Capture a new patient before adding them to the cabinet flow.</p>
+                <h2 className="text-xl font-bold text-slate-900">{ui.registerWalkInTitle}</h2>
+                <p className="text-sm text-slate-500">{ui.registerWalkInSubtitle}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setWalkInFormOpen(false)}
                 className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
               >
-                Close
+                {ui.close}
               </button>
             </div>
 
             <form onSubmit={handleWalkInSubmit} className="grid gap-4 px-6 py-6 md:grid-cols-2">
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Full Name</span>
+                <span className="text-sm font-medium text-slate-700">{ui.fullName}</span>
                 <input
                   required
                   value={walkInForm.name}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, name: event.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
-                  placeholder="e.g. Khadija El Idrissi"
+                  placeholder={isFrench ? 'ex. Khadija El Idrissi' : 'e.g. Khadija El Idrissi'}
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Phone</span>
+                <span className="text-sm font-medium text-slate-700">{ui.phone}</span>
                 <input
                   required
                   value={walkInForm.phone}
@@ -697,7 +760,7 @@ export default function DashboardPage() {
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Birth Date</span>
+                <span className="text-sm font-medium text-slate-700">{ui.birthDate}</span>
                 <input
                   required
                   type="date"
@@ -708,7 +771,7 @@ export default function DashboardPage() {
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Insurance Scheme</span>
+                <span className="text-sm font-medium text-slate-700">{ui.insuranceScheme}</span>
                 <select
                   value={walkInForm.insurance_scheme}
                   onChange={(event) =>
@@ -726,22 +789,22 @@ export default function DashboardPage() {
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Chronic Conditions</span>
+                <span className="text-sm font-medium text-slate-700">{ui.chronicConditions}</span>
                 <textarea
                   value={walkInForm.chronic_conditions}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, chronic_conditions: event.target.value }))}
                   className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
-                  placeholder="Separate with commas"
+                  placeholder={ui.separateWithCommas}
                 />
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Allergies</span>
+                <span className="text-sm font-medium text-slate-700">{ui.allergies}</span>
                 <textarea
                   value={walkInForm.allergies}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, allergies: event.target.value }))}
                   className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
-                  placeholder="Separate with commas"
+                  placeholder={ui.separateWithCommas}
                 />
               </label>
 
@@ -751,13 +814,13 @@ export default function DashboardPage() {
                   onClick={() => setWalkInFormOpen(false)}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {ui.cancel}
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
                 >
-                  Register Patient
+                  {ui.registerPatient}
                 </button>
               </div>
             </form>
@@ -770,21 +833,21 @@ export default function DashboardPage() {
           <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Queue Existing Patient</h2>
-                <p className="text-sm text-slate-500">Select a patient who already exists in the registry and add them to the waiting room.</p>
+                <h2 className="text-xl font-bold text-slate-900">{ui.queueTitle}</h2>
+                <p className="text-sm text-slate-500">{ui.queueSubtitle}</p>
               </div>
               <button
                 type="button"
                 onClick={closeQueueModal}
                 className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
               >
-                Close
+                {ui.close}
               </button>
             </div>
 
             <form onSubmit={handleQueueExistingSubmit} className="grid gap-4 px-6 py-6 md:grid-cols-2">
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Existing Patient</span>
+                <span className="text-sm font-medium text-slate-700">{ui.existingPatient}</span>
                 <div className="relative">
                   <input
                     required
@@ -800,7 +863,7 @@ export default function DashboardPage() {
                       }));
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
-                    placeholder="Search by name or AMO ID..."
+                    placeholder={ui.searchPlaceholder}
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
                   />
 
@@ -827,24 +890,24 @@ export default function DashboardPage() {
                         ))
                       ) : (
                         <div className="px-4 py-3 text-sm text-slate-500">
-                          No matching patients found.
+                          {ui.noMatchingPatients}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
                 {patients.length === 0 && (
-                  <p className="text-xs text-amber-600">No registered patients available. Register one first.</p>
+                  <p className="text-xs text-amber-600">{ui.noRegisteredPatients}</p>
                 )}
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Queue Notes</span>
+                <span className="text-sm font-medium text-slate-700">{ui.queueNotes}</span>
                 <textarea
                   value={queueForm.notes}
                   onChange={(event) => setQueueForm((current) => ({ ...current, notes: event.target.value }))}
                   className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
-                  placeholder="Optional triage notes or visit reason"
+                  placeholder={ui.queueNotesPlaceholder}
                 />
               </label>
 
@@ -854,13 +917,13 @@ export default function DashboardPage() {
                   onClick={closeQueueModal}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {ui.cancel}
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
                 >
-                  Queue Patient
+                  {ui.queuePatient}
                 </button>
               </div>
             </form>
@@ -878,7 +941,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Patients
+                    {ui.patients}
                   </p>
                   <p className="text-2xl font-bold text-slate-900 mt-1">
                     {patients.length}
@@ -894,7 +957,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Waiting
+                    {ui.waiting}
                   </p>
                   <p className="text-2xl font-bold text-orange-600 mt-1">
                     {waitingAppointments.length}
@@ -910,7 +973,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Appointments
+                    {ui.appointments}
                   </p>
                   <p className="text-2xl font-bold text-emerald-600 mt-1">
                     {appointments.length}
@@ -929,9 +992,9 @@ export default function DashboardPage() {
               <div className="w-5 h-5 bg-orange-100 rounded-lg flex items-center justify-center">
                 <Clock className="w-3 h-3 text-orange-600" strokeWidth={2.5} />
               </div>
-              <h2 className="text-lg font-bold text-slate-900">Live Waiting Room</h2>
+              <h2 className="text-lg font-bold text-slate-900">{ui.liveWaitingRoom}</h2>
               <span className="ml-auto text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
-                {waitingAppointments.length} {waitingAppointments.length === 1 ? 'patient' : 'patients'}
+                {ui.patientCount(waitingAppointments.length)}
               </span>
             </div>
 
@@ -940,8 +1003,8 @@ export default function DashboardPage() {
                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Clock className="w-6 h-6 text-slate-400" strokeWidth={1.5} />
                 </div>
-                <p className="text-slate-600 font-medium">No patients waiting</p>
-                <p className="text-sm text-slate-400 mt-1">Waiting room is empty</p>
+                <p className="text-slate-600 font-medium">{ui.noPatientsWaiting}</p>
+                <p className="text-sm text-slate-400 mt-1">{ui.waitingRoomEmpty}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -949,8 +1012,8 @@ export default function DashboardPage() {
                   const waitTime = getWaitTime(apt.checked_in_at);
                   const isLongestWaiting = apt.patient_id === longestWaitingPatientId;
                   const isOver15Min = waitTime > 15;
-                  const ownerLabel = apt.owner_username === currentUser?.username ? 'You' : apt.owner_username;
-                  const displayName = apt.patient_name || 'Unknown patient';
+                  const ownerLabel = apt.owner_username === currentUser?.username ? ui.you : apt.owner_username;
+                  const displayName = apt.patient_name || ui.unknownPatient;
 
                   return (
                     <div
@@ -1006,7 +1069,7 @@ export default function DashboardPage() {
                               }
 
                               // Show immediate feedback to user
-                              showFeedback(`Admitting ${displayName} to exam room...`);
+                              showFeedback(isFrench ? `Admission de ${displayName} en salle d’examen...` : `Admitting ${displayName} to exam room...`);
 
                               // Update appointment status with a small delay for visual feedback
                               setTimeout(() => {
@@ -1016,7 +1079,7 @@ export default function DashboardPage() {
                             }}
                             className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
                           >
-                            Admit to Exam
+                            {ui.admitToExam}
                           </button>
                         )}
                       </div>
@@ -1032,16 +1095,16 @@ export default function DashboardPage() {
                 <div className="w-5 h-5 bg-teal-100 rounded-lg flex items-center justify-center">
                   <ClipboardCheck className="w-3.5 h-3.5 text-teal-600" strokeWidth={2.5} />
                 </div>
-                <h2 className="text-lg font-bold text-slate-900">Completed Today</h2>
+                <h2 className="text-lg font-bold text-slate-900">{ui.completedToday}</h2>
                 <span className="ml-auto text-xs font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
-                  {completedExaminations.length} {completedExaminations.length === 1 ? 'case' : 'cases'}
+                  {ui.caseCount(completedExaminations.length)}
                 </span>
               </div>
 
               {completedExaminations.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-                  <p className="text-sm font-medium text-slate-700">No completed examinations yet</p>
-                  <p className="mt-1 text-xs text-slate-500">Finished consults will appear here once they are marked complete.</p>
+                  <p className="text-sm font-medium text-slate-700">{ui.noCompletedExams}</p>
+                  <p className="mt-1 text-xs text-slate-500">{ui.completedAppearsHere}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1075,7 +1138,7 @@ export default function DashboardPage() {
                                   : 'border border-slate-200 bg-slate-100 text-slate-600'
                               }`}
                             >
-                              {entry.hasPrescription ? 'Prescription Issued' : 'No Medication'}
+                              {entry.hasPrescription ? ui.prescriptionIssued : ui.noMedication}
                             </span>
                           </div>
                         </article>
@@ -1090,21 +1153,21 @@ export default function DashboardPage() {
 
         {/* Right Side - Today's Agenda (1 column) */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 h-fit">
-          <h2 className="text-lg font-bold text-slate-900 mb-6">Today's Agenda</h2>
+          <h2 className="text-lg font-bold text-slate-900 mb-6">{ui.todayAgenda}</h2>
 
           {todaysAgenda.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Calendar className="w-5 h-5 text-slate-400" strokeWidth={1.5} />
               </div>
-              <p className="text-slate-600 font-medium text-sm">No appointments scheduled for today</p>
-              <p className="text-xs text-slate-400 mt-1">Today's agenda is empty</p>
+              <p className="text-slate-600 font-medium text-sm">{ui.noAppointmentsToday}</p>
+              <p className="text-xs text-slate-400 mt-1">{ui.todayAgendaEmpty}</p>
             </div>
           ) : (
             <div className="space-y-4">
               {todaysAgenda.map((apt) => {
                 const appointmentTime = formatTime(apt.date_time);
-                const ownerLabel = apt.owner_username === currentUser?.username ? 'You' : apt.owner_username;
+                const ownerLabel = apt.owner_username === currentUser?.username ? ui.you : apt.owner_username;
 
                 return (
                   <div
@@ -1119,7 +1182,7 @@ export default function DashboardPage() {
                         {appointmentTime}
                       </p>
                       <p className="text-sm font-semibold text-slate-900 mt-1">
-                        {apt.patient_name || 'Unknown patient'}
+                        {apt.patient_name || ui.unknownPatient}
                       </p>
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mt-1">
                         {ownerLabel}
@@ -1128,7 +1191,7 @@ export default function DashboardPage() {
 
                     <div className="flex items-center gap-2 mt-2">
                       <span className="inline-block px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
-                        {apt.notes || 'Regular'}
+                        {apt.notes || ui.regular}
                       </span>
                     </div>
                   </div>
@@ -1140,7 +1203,7 @@ export default function DashboardPage() {
           {/* See More Link */}
           {todaysAppointments.length > 4 && (
             <button className="mt-6 w-full text-center text-sm font-medium text-teal-600 hover:text-teal-700 py-2 border-t border-slate-200 pt-4">
-              View Full Schedule
+              {ui.viewFullSchedule}
             </button>
           )}
         </div>

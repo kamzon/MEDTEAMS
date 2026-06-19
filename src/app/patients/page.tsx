@@ -5,13 +5,53 @@ import { useState } from 'react';
 import { useClinicStore } from '../../store/useClinicStore';
 import { useAuth } from '@/context/AuthContext';
 import { getRolePermissions, type UserRole } from '@/lib/roles';
+import { useAppSettingsStore } from '@/store/useAppSettingsStore';
 import { Search } from 'lucide-react';
 
 export default function PatientsPage() {
   const { currentUser } = useAuth();
+  const language = useAppSettingsStore((state) => state.language);
   const permissions = getRolePermissions(currentUser?.role as UserRole | undefined);
   const patients = useClinicStore((s) => s.patients);
   const [query, setQuery] = useState('');
+  const isFrench = language === 'FR';
+
+  const ui = {
+    title: isFrench ? 'Répertoire des patients' : 'Patient Directory',
+    subtitle: isFrench ? 'Liste complète des patients enregistrés' : 'Master list of registered patients',
+    limitedAccess: isFrench ? 'Votre rôle a un accès limité aux détails des patients.' : 'Your role has limited access to patient details.',
+    addPatient: isFrench ? 'Ajouter un patient' : 'Add Patient',
+    searchLabel: isFrench ? 'Rechercher des patients' : 'Search patients',
+    searchPlaceholder: isFrench ? 'Rechercher par nom ou identifiant AMO...' : 'Search by name or AMO ID...',
+    name: isFrench ? 'Nom' : 'Name',
+    amoId: 'AMO ID',
+    cin: 'CIN',
+    phone: isFrench ? 'Téléphone' : 'Phone',
+    insurance: isFrench ? 'Assurance' : 'Insurance',
+    conditions: isFrench ? 'Pathologies' : 'Conditions',
+    actions: isFrench ? 'Actions' : 'Actions',
+    noPatients: isFrench ? 'Aucun patient trouvé.' : 'No patients found.',
+    view: isFrench ? 'Voir' : 'View',
+    limited: isFrench ? 'Limité' : 'Limited',
+    newPatient: isFrench ? 'Nouveau patient' : 'New Patient',
+    close: isFrench ? 'Fermer' : 'Close',
+    fullName: isFrench ? 'Nom complet' : 'Full name',
+    birthDate: isFrench ? 'Date de naissance' : 'Birth date',
+    chronicConditions: isFrench ? 'Pathologies chroniques (séparées par des virgules)' : 'Chronic conditions (comma separated)',
+    allergies: isFrench ? 'Allergies (séparées par des virgules)' : 'Allergies (comma separated)',
+    cancel: isFrench ? 'Annuler' : 'Cancel',
+    create: isFrench ? 'Créer' : 'Create',
+    saving: isFrench ? 'Enregistrement...' : 'Saving...',
+    memberSince: isFrench ? 'Date d’ajout' : 'Member Since',
+    recentlyAdded: isFrench ? 'Récemment ajouté' : 'Recently added',
+    ownerAccess: isFrench ? 'L’accès propriétaire est requis' : 'Owner access required',
+    ownerDescription: isFrench ? 'Seul le propriétaire peut gérer les rôles et permissions du personnel.' : 'Only the owner can manage staff roles and permissions.',
+    loadingStaff: isFrench ? 'Chargement des patients...' : 'Loading patients...',
+    noStaffYet: isFrench ? 'Aucun patient pour le moment' : 'No patients found yet',
+    startFirst: isFrench ? 'Commencez par ajouter votre premier patient' : 'Start by adding your first patient',
+    roleLimited: isFrench ? 'Accès limité' : 'Limited',
+    conditionsNote: isFrench ? 'recherche par CIN possible si renseigné' : 'support searching by CIN if present',
+  };
 
   const normalized = query.trim().toLowerCase();
   const filtered = patients.filter((p) => {
@@ -37,23 +77,23 @@ export default function PatientsPage() {
     <div className="w-full min-h-screen bg-slate-50 p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Patient Directory</h1>
-          <p className="text-sm text-slate-500 mt-1">Master list of registered patients</p>
+          <h1 className="text-3xl font-bold text-slate-900">{ui.title}</h1>
+          <p className="text-sm text-slate-500 mt-1">{ui.subtitle}</p>
           {!permissions.canViewPatientDetails && (
             <p className="mt-2 text-xs font-medium text-amber-700">
-              Your role has limited access to patient details.
+              {ui.limitedAccess}
             </p>
           )}
         </div>
         <div>
-          {permissions.canAddPatients ? <AddPatientButton /> : null}
+          {permissions.canAddPatients ? <AddPatientButton ui={ui} /> : null}
         </div>
       </div>
 
       {/* Search */}
       <div className="mb-6 max-w-3xl">
         <label className="relative block">
-          <span className="sr-only">Search patients</span>
+          <span className="sr-only">{ui.searchLabel}</span>
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="w-5 h-5 text-slate-400" />
           </div>
@@ -61,7 +101,7 @@ export default function PatientsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or AMO ID..."
+            placeholder={ui.searchPlaceholder}
             className="w-full rounded-2xl border border-slate-200 bg-white px-12 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400"
           />
         </label>
@@ -72,20 +112,20 @@ export default function PatientsPage() {
         <table className="min-w-full divide-y divide-slate-200 table-auto">
           <thead className="bg-slate-50 sticky top-0 z-10">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{ui.name}</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">AMO ID</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">CIN</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Insurance</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Conditions</th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{ui.cin}</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{ui.phone}</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{ui.insurance}</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{ui.conditions}</th>
+              <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{ui.actions}</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-8 text-center text-slate-600">
-                  No patients found.
+                  {ui.noPatients}
                 </td>
               </tr>
             ) : (
@@ -125,9 +165,9 @@ export default function PatientsPage() {
                   </td>
                   <td className="px-6 py-4 align-top text-right">
                     {permissions.canViewPatientDetails ? (
-                      <Link href={`/patients/${patient.id}`} className="text-sm text-teal-600 font-medium hover:underline">View</Link>
+                      <Link href={`/patients/${patient.id}`} className="text-sm text-teal-600 font-medium hover:underline">{ui.view}</Link>
                     ) : (
-                      <span className="text-sm text-slate-400">Limited</span>
+                      <span className="text-sm text-slate-400">{ui.limited}</span>
                     )}
                   </td>
                 </tr>
@@ -140,7 +180,35 @@ export default function PatientsPage() {
   );
 }
 
-function AddPatientButton() {
+function AddPatientButton({ ui }: { ui: {
+  newPatient: string;
+  close: string;
+  fullName: string;
+  birthDate: string;
+  chronicConditions: string;
+  allergies: string;
+  cancel: string;
+  create: string;
+  saving: string;
+  loadingStaff: string;
+  noStaffYet: string;
+  startFirst: string;
+  roleLimited: string;
+  ownerAccess: string;
+  ownerDescription: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  name: string;
+  amoId: string;
+  cin: string;
+  phone: string;
+  insurance: string;
+  conditions: string;
+  actions: string;
+  noPatients: string;
+  view: string;
+  limited: string;
+} }) {
   const addPatient = useClinicStore((s) => s.addPatient);
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -209,7 +277,7 @@ function AddPatientButton() {
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg shadow-sm hover:bg-teal-700"
       >
-        + Add Patient
+        + {ui.newPatient}
       </button>
 
       {open && (
@@ -217,13 +285,13 @@ function AddPatientButton() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-xl p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">New Patient</h2>
-              <button type="button" onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-700">Close</button>
+              <h2 className="text-lg font-semibold">{ui.newPatient}</h2>
+              <button type="button" onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-700">{ui.close}</button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <label className="col-span-2">
-                <div className="text-xs text-slate-600 mb-1">Full name</div>
+                <div className="text-xs text-slate-600 mb-1">{ui.fullName}</div>
                 <input required value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border px-3 py-2" />
               </label>
 
@@ -238,12 +306,12 @@ function AddPatientButton() {
               </label>
 
               <label>
-                <div className="text-xs text-slate-600 mb-1">Phone</div>
+                <div className="text-xs text-slate-600 mb-1">{ui.phone}</div>
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-md border px-3 py-2" />
               </label>
 
               <label>
-                <div className="text-xs text-slate-600 mb-1">Birth date</div>
+                <div className="text-xs text-slate-600 mb-1">{ui.birthDate}</div>
                 <input
                   type="date"
                   value={birthDate}
@@ -254,7 +322,7 @@ function AddPatientButton() {
               </label>
 
               <label>
-                <div className="text-xs text-slate-600 mb-1">Insurance</div>
+                <div className="text-xs text-slate-600 mb-1">{ui.insurance}</div>
                 <select value={insurance} onChange={(e) => setInsurance(e.target.value as any)} className="w-full rounded-md border px-3 py-2">
                   <option>AMO-Achamil</option>
                   <option>AMO-Tadamon</option>
@@ -263,20 +331,20 @@ function AddPatientButton() {
               </label>
 
               <label className="col-span-2">
-                <div className="text-xs text-slate-600 mb-1">Chronic conditions (comma separated)</div>
+                <div className="text-xs text-slate-600 mb-1">{ui.chronicConditions}</div>
                 <input value={conditions} onChange={(e) => setConditions(e.target.value)} className="w-full rounded-md border px-3 py-2" />
               </label>
 
               <label className="col-span-2">
-                <div className="text-xs text-slate-600 mb-1">Allergies (comma separated)</div>
+                <div className="text-xs text-slate-600 mb-1">{ui.allergies}</div>
                 <input value={allergies} onChange={(e) => setAllergies(e.target.value)} className="w-full rounded-md border px-3 py-2" />
               </label>
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => { reset(); setOpen(false); }} className="px-4 py-2 rounded-md border">Cancel</button>
+              <button type="button" onClick={() => { reset(); setOpen(false); }} className="px-4 py-2 rounded-md border">{ui.cancel}</button>
               <button type="submit" disabled={isSaving} className="px-4 py-2 rounded-md bg-teal-600 text-white disabled:opacity-60">
-                {isSaving ? 'Saving...' : 'Create'}
+                {isSaving ? ui.saving : ui.create}
               </button>
             </div>
           </form>

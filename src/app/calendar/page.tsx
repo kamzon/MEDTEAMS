@@ -6,9 +6,11 @@ import { Plus, Clock, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight 
 import { useAuth } from '@/context/AuthContext';
 import { getInitials, getRoleLabel } from '@/lib/roles';
 import { loadLocalUsers, type StoredAuthUser } from '@/lib/localUsers';
+import { useAppSettingsStore } from '@/store/useAppSettingsStore';
 
 export default function CalendarPage() {
   const { currentUser } = useAuth();
+  const language = useAppSettingsStore((state) => state.language);
   const patients = useClinicStore((state) => state.patients);
   const appointments = useClinicStore((state) => state.appointments);
   const addAppointment = useClinicStore((state) => state.addAppointment);
@@ -25,6 +27,7 @@ export default function CalendarPage() {
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
   const calendarScrollRef = useRef<HTMLDivElement | null>(null);
+  const isFrench = language === 'FR';
 
   // Get start and end of current week
   const [weekStart, setWeekStart] = useState<Date>(() => {
@@ -69,6 +72,19 @@ export default function CalendarPage() {
     setIsModalOpen(true);
   };
 
+  const createAppointmentLabel = (day: Date, slotLabel: string) =>
+    isFrench
+      ? `Créer un rendez-vous pour le ${day.toLocaleDateString('fr-FR', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+        })} à ${slotLabel}`
+      : `Create appointment for ${day.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+        })} at ${slotLabel}`;
+
   // Time slots for the calendar (00:00 to 23:00)
   const timeSlots = Array.from({ length: 24 }, (_, i) => {
     const hour = i;
@@ -87,7 +103,12 @@ export default function CalendarPage() {
   });
 
   const formatDateFull = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   };
 
   const moveWeek = (direction: 'prev' | 'next') => {
@@ -108,13 +129,13 @@ export default function CalendarPage() {
     event.preventDefault();
 
     if (!formData.patientId || !formData.dateTime || !formData.reason) {
-      alert('Please fill in all fields');
+      alert(isFrench ? 'Veuillez remplir tous les champs' : 'Please fill in all fields');
       return;
     }
 
     const selectedPatient = patients.find((p) => p.id === formData.patientId);
     if (!selectedPatient) {
-      alert('Invalid patient selected');
+      alert(isFrench ? 'Patient sélectionné invalide' : 'Invalid patient selected');
       return;
     }
 
@@ -172,6 +193,53 @@ export default function CalendarPage() {
 
   const showAllCalendars = () => {
     setVisibleOwners(ownerOptions.map((user) => user.username));
+  };
+
+  const ui = {
+    title: isFrench ? 'Agenda et réservations' : 'Agenda & Booking Hub',
+    dateRange: isFrench ? 'au' : 'to',
+    newAppointment: isFrench ? 'Nouveau rendez-vous' : 'New Appointment',
+    previousWeek: isFrench ? 'Semaine précédente' : 'Previous Week',
+    weekView: isFrench ? 'Vue semaine' : 'Week View',
+    nextWeek: isFrench ? 'Semaine suivante' : 'Next Week',
+    people: isFrench ? 'Personnes' : 'People',
+    peopleDescription: isFrench
+      ? 'Sélectionnez les agendas de l’équipe à afficher, comme dans Outlook.'
+      : 'Select which clinic calendars are visible, like Outlook.',
+    showAllCalendars: isFrench ? 'Afficher tous les agendas' : 'Show all calendars',
+    time: isFrench ? 'Heure' : 'Time',
+    createAppointment: (day: Date, slotLabel: string) =>
+      isFrench
+        ? `Créer un rendez-vous pour le ${day.toLocaleDateString('fr-FR', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+          })} à ${slotLabel}`
+        : `Create appointment for ${day.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+          })} at ${slotLabel}`,
+    scheduleAppointment: isFrench ? 'Planifier un rendez-vous' : 'Schedule New Appointment',
+    modalDescription: isFrench
+      ? 'Ajoutez un nouveau rendez-vous au calendrier'
+      : 'Add a new appointment to the calendar',
+    close: isFrench ? 'Fermer' : 'Close',
+    patient: isFrench ? 'Patient' : 'Patient',
+    searchPlaceholder: isFrench ? 'Rechercher par nom ou identifiant AMO...' : 'Search by name or AMO ID...',
+    noPatients: isFrench ? 'Aucun patient correspondant.' : 'No matching patients found.',
+    noRegisteredPatients: isFrench ? 'Aucun patient enregistré disponible. Enregistrez-en un d’abord.' : 'No registered patients available. Register one first.',
+    dateTime: isFrench ? 'Date et heure' : 'Date & Time',
+    dateTimeHint: isFrench ? 'Choisissez d’abord la date, puis l’heure.' : 'Choose a date first, then a time.',
+    reason: isFrench ? 'Motif de la visite' : 'Reason for Visit',
+    reasonPlaceholder: isFrench
+      ? 'ex. Contrôle régulier, examen de suivi...'
+      : 'e.g., Regular checkup, Follow-up examination...',
+    cancel: isFrench ? 'Annuler' : 'Cancel',
+    save: isFrench ? 'Enregistrer le rendez-vous' : 'Save Appointment',
+    totalAppointments: isFrench ? 'Total des rendez-vous' : 'Total Appointments',
+    thisWeek: isFrench ? 'Cette semaine' : 'This Week',
+    completed: isFrench ? 'Terminés' : 'Completed',
   };
 
   // Get appointments for a specific day and time slot
@@ -261,13 +329,13 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Agenda & Booking Hub</h1>
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">{ui.title}</h1>
           <p className="text-slate-600">
-            {formatDateFull(weekStart)} to {formatDateFull(new Date(new Date(weekStart).getTime() + 6 * 24 * 60 * 60 * 1000))}
+            {formatDateFull(weekStart)} {ui.dateRange} {formatDateFull(new Date(new Date(weekStart).getTime() + 6 * 24 * 60 * 60 * 1000))}
           </p>
           {currentUser && (
             <p className="mt-2 text-sm font-medium text-teal-700">
-              Viewing shared clinic calendars as {currentUser.name}
+              {isFrench ? 'Affichage des agendas partagés de la clinique pour' : 'Viewing shared clinic calendars as'} {currentUser.name}
             </p>
           )}
         </div>
@@ -276,7 +344,7 @@ export default function CalendarPage() {
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors shadow-md"
         >
           <Plus className="w-5 h-5" />
-          New Appointment
+          {ui.newAppointment}
         </button>
       </div>
 
@@ -287,31 +355,26 @@ export default function CalendarPage() {
           className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-slate-700 font-medium"
         >
           <ChevronLeft className="w-4 h-4" />
-          Previous Week
+          {ui.previousWeek}
         </button>
-        <span className="text-sm font-semibold text-slate-600">Week View</span>
+        <span className="text-sm font-semibold text-slate-600">{ui.weekView}</span>
         <button
           onClick={() => moveWeek('next')}
           className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-slate-700 font-medium"
         >
-          Next Week
+          {ui.nextWeek}
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
-
       {/* People Bar */}
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">People</p>
-            <p className="mt-1 text-sm text-slate-600">Select which clinic calendars are visible, like Outlook.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{ui.people}</p>
+            <p className="mt-1 text-sm text-slate-600">{ui.peopleDescription}</p>
           </div>
-          <button
-            type="button"
-            onClick={showAllCalendars}
-            className="self-start rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-100"
-          >
-            Show all calendars
+          <button type="button" onClick={showAllCalendars} className="self-start rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-100">
+            {ui.showAllCalendars}
           </button>
         </div>
 
@@ -419,7 +482,7 @@ export default function CalendarPage() {
                             ? 'bg-white hover:bg-teal-50/60 cursor-pointer'
                             : 'bg-slate-50 hover:bg-slate-100 cursor-pointer'
                       }`}
-                      aria-label={`Create appointment for ${day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at ${slot.label}`}
+                      aria-label={createAppointmentLabel(day, slot.label)}
                     >
                       {hasAppointments ? (
                         <div className="space-y-1">
@@ -434,7 +497,7 @@ export default function CalendarPage() {
                                 className={`p-2 rounded-lg border-l-4 text-xs cursor-pointer hover:shadow-md transition-shadow ${getStatusColor(apt.status)}`}
                               >
                                 <div className="font-semibold text-slate-900 truncate">
-                                  {apt.patient_name || 'Unknown Patient'}
+                                  {apt.patient_name || (isFrench ? 'Patient inconnu' : 'Unknown patient')}
                                 </div>
                                 <div className="text-slate-600 mt-1 flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
@@ -477,15 +540,15 @@ export default function CalendarPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Schedule New Appointment</h2>
-                <p className="text-sm text-slate-500 mt-1">Add a new appointment to the calendar</p>
+                <h2 className="text-xl font-bold text-slate-900">{ui.scheduleAppointment}</h2>
+                <p className="text-sm text-slate-500 mt-1">{ui.modalDescription}</p>
               </div>
               <button
                 type="button"
                 onClick={closeModal}
                 className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
               >
-                Close
+                {ui.close}
               </button>
             </div>
 
@@ -495,7 +558,7 @@ export default function CalendarPage() {
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
                   <User className="w-4 h-4" />
-                  Patient
+                  {ui.patient}
                 </span>
                 <div className="relative">
                   <input
@@ -509,7 +572,7 @@ export default function CalendarPage() {
                       setFormData((prev) => ({ ...prev, patientId: '' }));
                     }}
                     onFocus={() => setIsPatientDropdownOpen(true)}
-                    placeholder="Search by name or AMO ID..."
+                    placeholder={ui.searchPlaceholder}
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
                   />
 
@@ -536,7 +599,7 @@ export default function CalendarPage() {
                         ))
                       ) : (
                         <div className="px-4 py-3 text-sm text-slate-500">
-                          No matching patients found.
+                          {ui.noPatients}
                         </div>
                       )}
                     </div>
@@ -548,8 +611,9 @@ export default function CalendarPage() {
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" />
-                  Date & Time
+                  {ui.dateTime}
                 </span>
+                <p className="text-xs text-slate-500">{ui.dateTimeHint}</p>
                 <input
                   required
                   type="datetime-local"
@@ -562,13 +626,13 @@ export default function CalendarPage() {
 
               {/* Reason/Notes */}
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Reason for Visit</span>
+                <span className="text-sm font-medium text-slate-700">{ui.reason}</span>
                 <textarea
                   required
                   name="reason"
                   value={formData.reason}
                   onChange={handleFormChange}
-                  placeholder="e.g., Regular checkup, Follow-up examination..."
+                  placeholder={ui.reasonPlaceholder}
                   className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
                 />
               </label>
@@ -580,13 +644,13 @@ export default function CalendarPage() {
                   onClick={closeModal}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {ui.cancel}
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
                 >
-                  Save Appointment
+                  {ui.save}
                 </button>
               </div>
             </form>
@@ -597,11 +661,11 @@ export default function CalendarPage() {
       {/* Stats Footer */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Appointments</p>
+          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{ui.totalAppointments}</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">{visibleAppointments.length}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">This Week</p>
+          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{ui.thisWeek}</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">
             {visibleAppointments.filter((apt) => {
               const aptDate = new Date(apt.date_time);
@@ -612,7 +676,7 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Completed</p>
+          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{ui.completed}</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">
             {visibleAppointments.filter((apt) => apt.status === 'completed').length}
           </p>

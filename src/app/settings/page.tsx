@@ -5,6 +5,7 @@ import { Users, Plus, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { addLocalUser, deleteLocalUser, loadLocalUsers, updateLocalUserRole } from '@/lib/localUsers';
 import { getInitials, getRoleLabel, getRolePermissions, type UserRole } from '@/lib/roles';
+import { useAppSettingsStore } from '@/store/useAppSettingsStore';
 
 interface User {
   id: string;
@@ -35,6 +36,7 @@ async function invokeTauriCommand<T>(command: string, args?: Record<string, unkn
 
 export default function SettingsPage() {
   const { currentUser } = useAuth();
+  const language = useAppSettingsStore((state) => state.language);
   const permissions = getRolePermissions(currentUser?.role);
   const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,6 +54,48 @@ export default function SettingsPage() {
     password: '',
     role: 'DOCTOR',
   });
+  const isFrench = language === 'FR';
+
+  const ui = {
+    ownerRequired: isFrench ? 'L’accès propriétaire est requis' : 'Owner access required',
+    ownerDescription: isFrench ? 'Seul le propriétaire peut gérer les rôles et les permissions du personnel.' : 'Only the owner can manage staff roles and permissions.',
+    clinicSettings: isFrench ? 'Paramètres de la clinique et gestion de l’équipe' : 'Clinic Settings & Team Management',
+    manageStaff: isFrench ? 'Gérez le personnel et les permissions de votre clinique' : 'Manage your clinic staff and permissions',
+    addStaff: isFrench ? 'Ajouter un membre du personnel' : 'Add Staff Member',
+    staffAdded: (name: string) => (isFrench ? `${name} a été ajouté avec succès !` : `${name} has been added successfully!`),
+    roleUpdated: (name: string, role: string) => (isFrench ? `Le rôle de ${name} a été mis à jour vers ${role}` : `${name} role updated to ${role}`),
+    userDeleted: (name: string) => (isFrench ? `${name} a été supprimé avec succès` : `${name} was deleted successfully`),
+    ownerCannotDelete: isFrench ? 'Le compte propriétaire ne peut pas être supprimé' : 'Owner account cannot be deleted',
+    currentUserDelete: isFrench ? 'Vous ne pouvez pas supprimer le compte que vous utilisez actuellement' : 'You cannot delete the account you are currently using',
+    deleteConfirm: (name: string) => (isFrench ? `Supprimer ${name} ? Cette action est irréversible.` : `Delete ${name}? This cannot be undone.`),
+    loading: isFrench ? 'Chargement des membres du personnel...' : 'Loading staff members...',
+    emptyTitle: isFrench ? 'Aucun membre du personnel pour le moment' : 'No staff members yet',
+    emptyBody: isFrench ? 'Commencez par ajouter votre premier membre d’équipe' : 'Start by adding your first team member',
+    name: isFrench ? 'Nom' : 'Name',
+    username: isFrench ? 'Nom d’utilisateur' : 'Username',
+    role: isFrench ? 'Rôle' : 'Role',
+    memberSince: isFrench ? 'Membre depuis' : 'Member Since',
+    actions: isFrench ? 'Actions' : 'Actions',
+    recentlyAdded: isFrench ? 'Ajouté récemment' : 'Recently added',
+    fullName: isFrench ? 'Nom complet' : 'Full Name',
+    password: isFrench ? 'Mot de passe' : 'Password',
+    roleSelect: isFrench ? 'Rôle' : 'Role',
+    cancel: isFrench ? 'Annuler' : 'Cancel',
+    save: isFrench ? 'Enregistrer' : 'Save',
+    delete: isFrench ? 'Supprimer' : 'Delete',
+    saving: isFrench ? 'Enregistrement...' : 'Saving...',
+    deleting: isFrench ? 'Suppression...' : 'Deleting...',
+    adding: isFrench ? 'Ajout...' : 'Adding...',
+    close: isFrench ? 'Fermer' : 'Close',
+    addModalTitle: isFrench ? 'Ajouter un membre du personnel' : 'Add Staff Member',
+    placeholderName: isFrench ? 'ex. Dr Sarah Johnson' : 'e.g., Dr. Sarah Johnson',
+    placeholderUsername: isFrench ? 'ex. sarah.johnson' : 'e.g., sarah.johnson',
+    placeholderPassword: isFrench ? 'Saisissez un mot de passe sécurisé' : 'Enter a secure password',
+    doctor: isFrench ? 'Médecin' : 'Doctor',
+    secretary: isFrench ? 'Secrétaire' : 'Secretary',
+    owner: isFrench ? 'Propriétaire' : 'Owner',
+    noRelatedDocs: isFrench ? 'Aucune documentation associée trouvée.' : 'No related documentation found.',
+  };
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -119,6 +163,7 @@ export default function SettingsPage() {
       }
 
       setSuccessMessage(`${user.name} role updated to ${nextRole}`);
+      setSuccessMessage(ui.roleUpdated(user.name, nextRole));
       await fetchUsers();
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -155,6 +200,7 @@ export default function SettingsPage() {
       }
 
       setSuccessMessage(`${user.name} was deleted successfully`);
+      setSuccessMessage(ui.userDeleted(user.name));
       await fetchUsers();
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -176,7 +222,7 @@ export default function SettingsPage() {
           role: formData.role,
           name: formData.name.trim(),
         });
-        setSuccessMessage(`${formData.name} has been added successfully!`);
+        setSuccessMessage(ui.staffAdded(formData.name));
         await fetchUsers();
       } else {
         addLocalUser({
@@ -185,7 +231,7 @@ export default function SettingsPage() {
           role: formData.role,
           name: formData.name.trim(),
         });
-        setSuccessMessage(`${formData.name} has been added successfully!`);
+        setSuccessMessage(ui.staffAdded(formData.name));
         await fetchUsers();
       }
 
@@ -193,7 +239,7 @@ export default function SettingsPage() {
       setFormData({ name: '', username: '', password: '', role: 'DOCTOR' });
       setIsModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add staff member');
+      setError(err instanceof Error ? err.message : (isFrench ? 'Impossible d’ajouter le membre du personnel' : 'Failed to add staff member'));
     } finally {
       setIsSubmitting(false);
     }
@@ -219,9 +265,9 @@ export default function SettingsPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
             <Users className="h-7 w-7" strokeWidth={1.8} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Owner access required</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{ui.ownerRequired}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Only the owner can manage staff roles and permissions.
+            {ui.ownerDescription}
           </p>
           {currentUser && (
             <div className="mt-6 inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -248,8 +294,8 @@ export default function SettingsPage() {
               <Users className="w-5 h-5 text-white" strokeWidth={2} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Clinic Settings & Team Management</h1>
-              <p className="text-sm text-slate-500 mt-1">Manage your clinic staff and permissions</p>
+              <h1 className="text-2xl font-bold text-slate-900">{ui.clinicSettings}</h1>
+              <p className="text-sm text-slate-500 mt-1">{ui.manageStaff}</p>
             </div>
           </div>
           <button
@@ -257,7 +303,7 @@ export default function SettingsPage() {
             className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-sm"
           >
             <Plus className="w-5 h-5" strokeWidth={2} />
-            Add Staff Member
+            {ui.addStaff}
           </button>
         </div>
       </div>
@@ -281,24 +327,24 @@ export default function SettingsPage() {
               <div className="inline-block">
                 <div className="w-8 h-8 border-2 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
               </div>
-              <p className="mt-3 text-slate-600">Loading staff members...</p>
+              <p className="mt-3 text-slate-600">{ui.loading}</p>
             </div>
           ) : users.length === 0 ? (
             <div className="p-12 text-center">
               <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" strokeWidth={1.5} />
-              <p className="text-slate-600 font-medium">No staff members yet</p>
-              <p className="text-slate-500 text-sm mt-1">Start by adding your first team member</p>
+              <p className="text-slate-600 font-medium">{ui.emptyTitle}</p>
+              <p className="text-slate-500 text-sm mt-1">{ui.emptyBody}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Name</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Username</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Role</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Member Since</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Actions</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">{ui.name}</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">{ui.username}</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">{ui.role}</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">{ui.memberSince}</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">{ui.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -332,7 +378,7 @@ export default function SettingsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-slate-500 text-sm">Recently added</span>
+                        <span className="text-slate-500 text-sm">{ui.recentlyAdded}</span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap items-center gap-2">
@@ -341,9 +387,9 @@ export default function SettingsPage() {
                             onChange={(event) => handleRoleChange(user.id, event.target.value as UserRole)}
                             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
                           >
-                            <option value="DOCTOR">Doctor</option>
-                            <option value="SECRETARY">Secretary</option>
-                            <option value="OWNER">Owner</option>
+                            <option value="DOCTOR">{ui.doctor}</option>
+                            <option value="SECRETARY">{ui.secretary}</option>
+                            <option value="OWNER">{ui.owner}</option>
                           </select>
                           <button
                             type="button"
@@ -351,7 +397,7 @@ export default function SettingsPage() {
                             disabled={(roleDrafts[user.id] ?? user.role) === user.role || savingUserId === user.id}
                             className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-600/50"
                           >
-                            {savingUserId === user.id ? 'Saving...' : 'Save'}
+                            {savingUserId === user.id ? ui.saving : ui.save}
                           </button>
                           <button
                             type="button"
@@ -359,7 +405,7 @@ export default function SettingsPage() {
                             disabled={deletingUserId === user.id || currentUser?.id === user.id || user.role === 'OWNER'}
                             className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {deletingUserId === user.id ? 'Deleting...' : 'Delete'}
+                            {deletingUserId === user.id ? ui.deleting : ui.delete}
                           </button>
                         </div>
                       </td>
@@ -376,7 +422,7 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200">
             <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between bg-gradient-to-r from-teal-600 to-teal-700">
-              <h2 className="text-lg font-bold text-white">Add Staff Member</h2>
+              <h2 className="text-lg font-bold text-white">{ui.addModalTitle}</h2>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-white/70 hover:text-white transition-colors"
@@ -387,55 +433,55 @@ export default function SettingsPage() {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">Full Name</label>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">{ui.fullName}</label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="e.g., Dr. Sarah Johnson"
+                  placeholder={ui.placeholderName}
                   required
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">Username</label>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">{ui.username}</label>
                 <input
                   type="text"
                   name="username"
                   value={formData.username}
                   onChange={handleInputChange}
-                  placeholder="e.g., sarah.johnson"
+                  placeholder={ui.placeholderUsername}
                   required
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">Password</label>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">{ui.password}</label>
                 <input
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  placeholder="Enter a secure password"
+                  placeholder={ui.placeholderPassword}
                   required
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">Role</label>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">{ui.roleSelect}</label>
                 <select
                   name="role"
                   value={formData.role}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 transition bg-white"
                 >
-                  <option value="DOCTOR">Doctor</option>
-                  <option value="SECRETARY">Secretary</option>
-                  <option value="OWNER">Owner</option>
+                  <option value="DOCTOR">{ui.doctor}</option>
+                  <option value="SECRETARY">{ui.secretary}</option>
+                  <option value="OWNER">{ui.owner}</option>
                 </select>
               </div>
 
@@ -451,14 +497,14 @@ export default function SettingsPage() {
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 px-4 py-2 border border-slate-300 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {ui.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
                   className="flex-1 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-600/50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
                 >
-                  {isSubmitting ? 'Adding...' : 'Add Staff Member'}
+                  {isSubmitting ? ui.adding : ui.addStaff}
                 </button>
               </div>
             </form>
