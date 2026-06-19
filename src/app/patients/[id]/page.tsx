@@ -3,12 +3,16 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { useClinicStore } from '../../../store/useClinicStore';
 import VitalsChart from '@/components/VitalsChart';
+import { getRolePermissions, type UserRole } from '@/lib/roles';
 
 export default function PatientClinicalWorkspace() {
   const params = useParams();
   const id = params?.id as string | undefined;
+  const { currentUser } = useAuth();
+  const permissions = getRolePermissions(currentUser?.role as UserRole | undefined);
   const addConsultationNote = useClinicStore((s) => s.addConsultationNote);
 
   const [patient, setPatient] = useState<any>(null);
@@ -42,6 +46,33 @@ export default function PatientClinicalWorkspace() {
           <p className="mt-3 text-slate-600">We couldn't find the requested patient.</p>
           <div className="mt-6">
             <Link href="/patients" className="inline-block px-4 py-2 bg-teal-600 text-white rounded-md">Back to Directory</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!permissions.canViewPatientDetails) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-8">
+        <div className="mb-4">
+          <Link href="/patients" className="text-slate-500 hover:text-slate-700">← Back to Directory</Link>
+        </div>
+        <div className="max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900">{patient.name}</h1>
+          <p className="mt-2 text-sm text-slate-500">{patient.amo_id} • {patient.insurance_scheme}</p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone</div>
+              <div className="mt-1 text-sm text-slate-900">{patient.phone}</div>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Birth Date</div>
+              <div className="mt-1 text-sm text-slate-900">{patient.birth_date}</div>
+            </div>
+          </div>
+          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Clinical notes and consultation actions are restricted for your role.
           </div>
         </div>
       </div>

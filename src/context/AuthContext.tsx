@@ -38,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    if (typeof window !== 'undefined') {
+      window.location.assign('/');
+    }
   };
 
   return (

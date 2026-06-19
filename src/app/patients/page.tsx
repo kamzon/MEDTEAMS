@@ -3,9 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useClinicStore } from '../../store/useClinicStore';
+import { useAuth } from '@/context/AuthContext';
+import { getRolePermissions, type UserRole } from '@/lib/roles';
 import { Search } from 'lucide-react';
 
 export default function PatientsPage() {
+  const { currentUser } = useAuth();
+  const permissions = getRolePermissions(currentUser?.role as UserRole | undefined);
   const patients = useClinicStore((s) => s.patients);
   const [query, setQuery] = useState('');
 
@@ -35,9 +39,14 @@ export default function PatientsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Patient Directory</h1>
           <p className="text-sm text-slate-500 mt-1">Master list of registered patients</p>
+          {!permissions.canViewPatientDetails && (
+            <p className="mt-2 text-xs font-medium text-amber-700">
+              Your role has limited access to patient details.
+            </p>
+          )}
         </div>
         <div>
-          <AddPatientButton />
+          {permissions.canAddPatients ? <AddPatientButton /> : null}
         </div>
       </div>
 
@@ -83,7 +92,7 @@ export default function PatientsPage() {
               filtered.map((patient) => (
                 <tr key={patient.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 align-top">
-                    <Link href={`/patients/${patient.id}`} className="flex items-center gap-3">
+                    <Link href={permissions.canViewPatientDetails ? `/patients/${patient.id}` : '#'} className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center font-semibold">{initials(patient.name)}</div>
                       <div>
                         <div className="font-semibold text-slate-900">{patient.name}</div>
@@ -115,7 +124,11 @@ export default function PatientsPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 align-top text-right">
-                    <Link href={`/patients/${patient.id}`} className="text-sm text-teal-600 font-medium hover:underline">View</Link>
+                    {permissions.canViewPatientDetails ? (
+                      <Link href={`/patients/${patient.id}`} className="text-sm text-teal-600 font-medium hover:underline">View</Link>
+                    ) : (
+                      <span className="text-sm text-slate-400">Limited</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -145,8 +158,12 @@ function AddPatientButton() {
   ) => {
     const input = event.currentTarget;
 
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
+    if (event.type === 'click' && typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+      } catch {
+        // Ignore browsers that block programmatic picker opening.
+      }
     }
   };
 
@@ -232,7 +249,6 @@ function AddPatientButton() {
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
                   onClick={openNativeDatePicker}
-                  onFocus={openNativeDatePicker}
                   className="w-full min-h-11 cursor-pointer rounded-md border px-3 py-2 appearance-auto"
                 />
               </label>

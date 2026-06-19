@@ -126,6 +126,8 @@ type StoredClinicState = Pick<ClinicStore, 'patients' | 'appointments' | 'consul
 
 const AUTH_STORAGE_KEY = 'medteams-active-user';
 const STORE_KEY_PREFIX = 'medteams-clinic-store';
+const SHARED_STORE_KEY = `${STORE_KEY_PREFIX}:shared`;
+const ANONYMOUS_STORE_KEY = `${STORE_KEY_PREFIX}:anonymous`;
 
 function getActiveUsernameFromStorage() {
   if (typeof window === 'undefined') {
@@ -146,7 +148,7 @@ function getActiveUsernameFromStorage() {
 }
 
 function getScopedStoreKey(username: string | null) {
-  return `${STORE_KEY_PREFIX}:${username ?? 'anonymous'}`;
+  return username ? SHARED_STORE_KEY : ANONYMOUS_STORE_KEY;
 }
 
 function loadScopedStore(username: string | null): StoredClinicState | null {
@@ -155,6 +157,17 @@ function loadScopedStore(username: string | null): StoredClinicState | null {
   }
 
   try {
+    const sharedStored = localStorage.getItem(SHARED_STORE_KEY);
+    if (sharedStored) {
+      return JSON.parse(sharedStored) as StoredClinicState;
+    }
+
+    const legacyStored = username ? localStorage.getItem(`${STORE_KEY_PREFIX}:${username}`) : null;
+    if (legacyStored) {
+      localStorage.setItem(SHARED_STORE_KEY, legacyStored);
+      return JSON.parse(legacyStored) as StoredClinicState;
+    }
+
     const stored = localStorage.getItem(getScopedStoreKey(username));
     return stored ? (JSON.parse(stored) as StoredClinicState) : null;
   } catch (error) {
@@ -172,7 +185,13 @@ function saveScopedStore(
   }
 
   try {
-    localStorage.setItem(getScopedStoreKey(username), JSON.stringify(state));
+    localStorage.setItem(SHARED_STORE_KEY, JSON.stringify(state));
+
+    if (username) {
+      localStorage.setItem(`${STORE_KEY_PREFIX}:${username}`, JSON.stringify(state));
+    } else {
+      localStorage.setItem(ANONYMOUS_STORE_KEY, JSON.stringify(state));
+    }
   } catch (error) {
     console.warn('Failed to save clinic store to localStorage:', error);
   }

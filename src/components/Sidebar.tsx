@@ -16,6 +16,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { getInitials, getRoleLabel } from '@/lib/roles';
 
 type UserRole = 'doctor' | 'secretary';
 type Language = 'FR' | 'AR';
@@ -116,6 +117,21 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       {/* Footer Controls Section */}
       {isOpen && (
         <div className="border-t border-slate-200 px-4 py-6 space-y-4">
+          {currentUser && (
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-teal-600 to-slate-800 text-sm font-bold text-white">
+                {getInitials(currentUser.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900">{currentUser.name}</p>
+                <p className="truncate text-xs text-slate-500">{currentUser.username}</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
+                {getRoleLabel(currentUser.role)}
+              </span>
+            </div>
+          )}
+
           {/* Role Toggle */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block">
@@ -206,6 +222,19 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       {/* Collapsed State - Icon Tooltips */}
       {!isOpen && (
         <div className="border-t border-slate-200 px-2 py-6 space-y-2">
+          {currentUser && (
+            <div className="px-2 py-2">
+              <button
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-left"
+                title={`${currentUser.name} (${getRoleLabel(currentUser.role)})`}
+              >
+                <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-600 to-slate-800 text-xs font-bold text-white">
+                  {getInitials(currentUser.name)}
+                </div>
+              </button>
+            </div>
+          )}
+
           <div className="px-2 py-2">
             <button
               onClick={() => setUserRole(userRole === 'doctor' ? 'secretary' : 'doctor')}

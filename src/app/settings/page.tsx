@@ -4,8 +4,7 @@ import { useEffect, useState, FormEvent } from 'react';
 import { Users, Plus, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { addLocalUser, deleteLocalUser, loadLocalUsers, updateLocalUserRole } from '@/lib/localUsers';
-
-type UserRole = 'DOCTOR' | 'SECRETARY' | 'OWNER';
+import { getInitials, getRoleLabel, getRolePermissions, type UserRole } from '@/lib/roles';
 
 interface User {
   id: string;
@@ -36,6 +35,7 @@ async function invokeTauriCommand<T>(command: string, args?: Record<string, unkn
 
 export default function SettingsPage() {
   const { currentUser } = useAuth();
+  const permissions = getRolePermissions(currentUser?.role);
   const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -211,6 +211,33 @@ export default function SettingsPage() {
         return 'bg-slate-100 text-slate-700 border border-slate-200';
     }
   };
+
+  if (!permissions.canManageStaff) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6 py-12 bg-slate-50">
+        <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+            <Users className="h-7 w-7" strokeWidth={1.8} />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Owner access required</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Only the owner can manage staff roles and permissions.
+          </p>
+          {currentUser && (
+            <div className="mt-6 inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-teal-600 to-slate-800 text-sm font-bold text-white">
+                {getInitials(currentUser.name)}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-slate-900">{currentUser.name}</p>
+                <p className="text-xs text-slate-500">{getRoleLabel(currentUser.role)}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
