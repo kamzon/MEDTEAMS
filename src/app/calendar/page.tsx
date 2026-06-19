@@ -3,11 +3,17 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useClinicStore } from '../../store/useClinicStore';
 import { Plus, Clock, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { getInitials, getRoleLabel } from '@/lib/roles';
+import { loadLocalUsers, type StoredAuthUser } from '@/lib/localUsers';
 
 export default function CalendarPage() {
+  const { currentUser } = useAuth();
   const patients = useClinicStore((state) => state.patients);
   const appointments = useClinicStore((state) => state.appointments);
   const addAppointment = useClinicStore((state) => state.addAppointment);
+  const [calendarUsers, setCalendarUsers] = useState<StoredAuthUser[]>([]);
+  const [visibleOwners, setVisibleOwners] = useState<string[]>([]);
 
   // Modal and form state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -114,6 +120,8 @@ export default function CalendarPage() {
 
     addAppointment({
       patient_id: formData.patientId,
+      patient_name: selectedPatient.name,
+      owner_username: currentUser?.username ?? 'shared',
       date_time: new Date(formData.dateTime).toISOString(),
       status: 'scheduled',
       checked_in_at: null,
@@ -124,9 +132,55 @@ export default function CalendarPage() {
     closeModal();
   };
 
+  useEffect(() => {
+    const users = loadLocalUsers();
+    setCalendarUsers(users);
+    setVisibleOwners((currentSelection) => {
+      if (currentSelection.length > 0) {
+        return currentSelection.filter((username) => users.some((user) => user.username === username));
+      }
+
+      return users.map((user) => user.username);
+    });
+  }, []);
+
+  const ownerOptions: StoredAuthUser[] =
+    calendarUsers.length > 0
+      ? calendarUsers
+      : currentUser
+        ? [
+            {
+              id: currentUser.id,
+              username: currentUser.username,
+              password: '',
+              role: currentUser.role,
+              name: currentUser.name,
+            },
+          ]
+        : [];
+
+  const toggleOwnerVisibility = (username: string) => {
+    setVisibleOwners((currentSelection) => {
+      if (currentSelection.includes(username)) {
+        const nextSelection = currentSelection.filter((owner) => owner !== username);
+        return nextSelection.length > 0 ? nextSelection : currentSelection;
+      }
+
+      return [...currentSelection, username];
+    });
+  };
+
+  const showAllCalendars = () => {
+    setVisibleOwners(ownerOptions.map((user) => user.username));
+  };
+
   // Get appointments for a specific day and time slot
   const getAppointmentsForSlot = (dayDate: Date, hourStart: number) => {
     return appointments.filter((apt) => {
+      if (visibleOwners.length > 0 && !visibleOwners.includes(apt.owner_username)) {
+        return false;
+      }
+
       const aptDate = new Date(apt.date_time);
       const aptHour = aptDate.getHours();
       const aptDay = aptDate.getDate();
@@ -186,6 +240,10 @@ export default function CalendarPage() {
     setIsPatientDropdownOpen(false);
   };
 
+  const visibleAppointments = appointments.filter((appointment) =>
+    visibleOwners.length === 0 ? true : visibleOwners.includes(appointment.owner_username)
+  );
+
   useEffect(() => {
     const scrollContainer = calendarScrollRef.current;
     if (!scrollContainer) {
@@ -207,6 +265,11 @@ export default function CalendarPage() {
           <p className="text-slate-600">
             {formatDateFull(weekStart)} to {formatDateFull(new Date(new Date(weekStart).getTime() + 6 * 24 * 60 * 60 * 1000))}
           </p>
+          {currentUser && (
+            <p className="mt-2 text-sm font-medium text-teal-700">
+              Viewing shared clinic calendars as {currentUser.name}
+            </p>
+          )}
         </div>
         <button
           onClick={openBlankAppointmentModal}
@@ -234,6 +297,66 @@ export default function CalendarPage() {
           Next Week
           <ChevronRight className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* People Bar */}
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">People</p>
+            <p className="mt-1 text-sm text-slate-600">Select which clinic calendars are visible, like Outlook.</p>
+          </div>
+          <button
+            type="button"
+            onClick={showAllCalendars}
+            className="self-start rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-100"
+          >
+            Show all calendars
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          {ownerOptions.map((user, index) => {
+            const isVisible = visibleOwners.includes(user.username);
+            const colorBands = [
+              'from-teal-500 to-emerald-500',
+              'from-sky-500 to-blue-500',
+              'from-orange-500 to-rose-500',
+              'from-violet-500 to-fuchsia-500',
+            ];
+            const band = colorBands[index % colorBands.length];
+
+            return (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => toggleOwnerVisibility(user.username)}
+                className={`flex min-w-56 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${
+                  isVisible
+                    ? 'border-teal-300 bg-teal-50 shadow-sm'
+                    : 'border-slate-200 bg-slate-50/80 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${band} text-sm font-bold text-white shadow-sm`}>
+                  {getInitials(user.name)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-900">{user.name}</span>
+                  <span className="block text-xs text-slate-500">
+                    {user.username} · {getRoleLabel(user.role)}
+                  </span>
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                    isVisible ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {isVisible ? 'Visible' : 'Hidden'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Calendar Grid */}
@@ -301,9 +424,9 @@ export default function CalendarPage() {
                       {hasAppointments ? (
                         <div className="space-y-1">
                           {slotAppointments.map((apt) => {
-                            const patient = patients.find((p) => p.id === apt.patient_id);
                             const aptTime = new Date(apt.date_time);
                             const displayTime = `${String(aptTime.getHours()).padStart(2, '0')}:${String(aptTime.getMinutes()).padStart(2, '0')}`;
+                            const ownerLabel = apt.owner_username === currentUser?.username ? 'You' : apt.owner_username;
 
                             return (
                               <div
@@ -311,7 +434,7 @@ export default function CalendarPage() {
                                 className={`p-2 rounded-lg border-l-4 text-xs cursor-pointer hover:shadow-md transition-shadow ${getStatusColor(apt.status)}`}
                               >
                                 <div className="font-semibold text-slate-900 truncate">
-                                  {patient?.name || 'Unknown Patient'}
+                                  {apt.patient_name || 'Unknown Patient'}
                                 </div>
                                 <div className="text-slate-600 mt-1 flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
@@ -320,6 +443,11 @@ export default function CalendarPage() {
                                 <div className="mt-1">
                                   <span className="inline-block px-1.5 py-0.5 bg-white bg-opacity-60 rounded text-xs font-medium">
                                     {getStatusBadge(apt.status)}
+                                  </span>
+                                </div>
+                                <div className="mt-1">
+                                  <span className="inline-block rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                                    {ownerLabel}
                                   </span>
                                 </div>
                               </div>
@@ -470,12 +598,12 @@ export default function CalendarPage() {
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Total Appointments</p>
-          <p className="text-3xl font-bold text-slate-900 mt-2">{appointments.length}</p>
+          <p className="text-3xl font-bold text-slate-900 mt-2">{visibleAppointments.length}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">This Week</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">
-            {appointments.filter((apt) => {
+            {visibleAppointments.filter((apt) => {
               const aptDate = new Date(apt.date_time);
               const aptWeekStart = new Date(aptDate);
               aptWeekStart.setDate(aptWeekStart.getDate() - aptWeekStart.getDay() + 1);
@@ -486,7 +614,7 @@ export default function CalendarPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Completed</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">
-            {appointments.filter((apt) => apt.status === 'completed').length}
+            {visibleAppointments.filter((apt) => apt.status === 'completed').length}
           </p>
         </div>
       </div>

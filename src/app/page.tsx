@@ -363,6 +363,8 @@ export default function DashboardPage() {
 
     addAppointment({
       patient_id: selectedPatient.id,
+      patient_name: selectedPatient.name,
+      owner_username: currentUser?.username ?? 'shared',
       date_time: new Date().toISOString(),
       status: 'waiting',
       checked_in_at: new Date().toISOString(),
@@ -944,10 +946,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {waitingAppointments.map((apt, index) => {
-                  const patient = patients.find((p) => p.id === apt.patient_id);
                   const waitTime = getWaitTime(apt.checked_in_at);
                   const isLongestWaiting = apt.patient_id === longestWaitingPatientId;
                   const isOver15Min = waitTime > 15;
+                  const ownerLabel = apt.owner_username === currentUser?.username ? 'You' : apt.owner_username;
+                  const displayName = apt.patient_name || 'Unknown patient';
 
                   return (
                     <div
@@ -972,9 +975,9 @@ export default function DashboardPage() {
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-slate-900 truncate">
-                              {patient?.name}
+                              {displayName}
                             </p>
-                            <p className="text-xs text-slate-500">{patient?.amo_id}</p>
+                            <p className="text-xs text-slate-500">{apt.notes}</p>
                           </div>
                         </div>
 
@@ -988,6 +991,9 @@ export default function DashboardPage() {
                           >
                             {waitTime}m
                           </p>
+                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            {ownerLabel}
+                          </p>
                         </div>
 
                         {/* Admit Button (for longest waiting) */}
@@ -995,17 +1001,17 @@ export default function DashboardPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (!patient || !apt) {
+                              if (!apt) {
                                 return;
                               }
 
                               // Show immediate feedback to user
-                              showFeedback(`Admitting ${patient.name} to exam room...`);
+                              showFeedback(`Admitting ${displayName} to exam room...`);
 
                               // Update appointment status with a small delay for visual feedback
                               setTimeout(() => {
-                                updatePatientStatus(patient.id, 'in_exam');
-                                console.log(`✓ ${patient.name} (${patient.amo_id}) admitted to exam at ${new Date().toLocaleTimeString()}`);
+                                updatePatientStatus(apt.patient_id, 'in_exam');
+                                console.log(`✓ ${displayName} admitted to exam at ${new Date().toLocaleTimeString()}`);
                               }, 300);
                             }}
                             className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
@@ -1097,8 +1103,8 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-4">
               {todaysAgenda.map((apt) => {
-                const patient = patients.find((p) => p.id === apt.patient_id);
                 const appointmentTime = formatTime(apt.date_time);
+                const ownerLabel = apt.owner_username === currentUser?.username ? 'You' : apt.owner_username;
 
                 return (
                   <div
@@ -1113,7 +1119,10 @@ export default function DashboardPage() {
                         {appointmentTime}
                       </p>
                       <p className="text-sm font-semibold text-slate-900 mt-1">
-                        {patient?.name}
+                        {apt.patient_name || 'Unknown patient'}
+                      </p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mt-1">
+                        {ownerLabel}
                       </p>
                     </div>
 

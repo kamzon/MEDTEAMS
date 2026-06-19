@@ -19,10 +19,12 @@ export interface Patient {
 export interface Appointment {
   id: string;
   patient_id: string;
+  patient_name: string;
   date_time: string;
   status: 'scheduled' | 'waiting' | 'in_exam' | 'billing' | 'completed';
   checked_in_at: string | null;
   notes: string;
+  owner_username: string;
 }
 
 export interface Consultation {
@@ -65,6 +67,8 @@ export interface PatientInput {
 
 export interface AppointmentInput {
   patient_id: string;
+  patient_name: string;
+  owner_username: string;
   date_time: string;
   status: Appointment['status'];
   checked_in_at: string | null;
@@ -122,12 +126,11 @@ export interface ClinicStore {
   getAttachmentsByPatient: (patientId: string) => Attachment[];
 }
 
-type StoredClinicState = Pick<ClinicStore, 'patients' | 'appointments' | 'consultations' | 'attachments'>;
+type ScopedClinicState = Pick<ClinicStore, 'patients' | 'consultations' | 'attachments'>;
 
 const AUTH_STORAGE_KEY = 'medteams-active-user';
 const STORE_KEY_PREFIX = 'medteams-clinic-store';
-const SHARED_STORE_KEY = `${STORE_KEY_PREFIX}:shared`;
-const ANONYMOUS_STORE_KEY = `${STORE_KEY_PREFIX}:anonymous`;
+const SHARED_APPOINTMENTS_KEY = `${STORE_KEY_PREFIX}:appointments:shared`;
 
 function getActiveUsernameFromStorage() {
   if (typeof window === 'undefined') {
@@ -148,28 +151,26 @@ function getActiveUsernameFromStorage() {
 }
 
 function getScopedStoreKey(username: string | null) {
-  return username ? SHARED_STORE_KEY : ANONYMOUS_STORE_KEY;
+  return `${STORE_KEY_PREFIX}:${username ?? 'anonymous'}`;
 }
 
-function loadScopedStore(username: string | null): StoredClinicState | null {
+function loadScopedStore(username: string | null): ScopedClinicState | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    const sharedStored = localStorage.getItem(SHARED_STORE_KEY);
-    if (sharedStored) {
-      return JSON.parse(sharedStored) as StoredClinicState;
-    }
-
-    const legacyStored = username ? localStorage.getItem(`${STORE_KEY_PREFIX}:${username}`) : null;
-    if (legacyStored) {
-      localStorage.setItem(SHARED_STORE_KEY, legacyStored);
-      return JSON.parse(legacyStored) as StoredClinicState;
-    }
-
     const stored = localStorage.getItem(getScopedStoreKey(username));
-    return stored ? (JSON.parse(stored) as StoredClinicState) : null;
+    if (!stored) {
+      return null;
+    }
+
+    const parsed = JSON.parse(stored) as ScopedClinicState;
+    return {
+      patients: Array.isArray(parsed.patients) ? parsed.patients : [],
+      consultations: Array.isArray(parsed.consultations) ? parsed.consultations : [],
+      attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
+    };
   } catch (error) {
     console.warn('Failed to load clinic store from localStorage:', error);
     return null;
@@ -178,22 +179,98 @@ function loadScopedStore(username: string | null): StoredClinicState | null {
 
 function saveScopedStore(
   username: string | null,
-  state: StoredClinicState
+  state: ScopedClinicState
 ) {
   if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    localStorage.setItem(SHARED_STORE_KEY, JSON.stringify(state));
-
-    if (username) {
-      localStorage.setItem(`${STORE_KEY_PREFIX}:${username}`, JSON.stringify(state));
-    } else {
-      localStorage.setItem(ANONYMOUS_STORE_KEY, JSON.stringify(state));
-    }
+    localStorage.setItem(getScopedStoreKey(username), JSON.stringify(state));
   } catch (error) {
     console.warn('Failed to save clinic store to localStorage:', error);
+  }
+}
+
+function normalizeAppointment(
+  appointment: Partial<Appointment> & { id: string; patient_id: string; date_time: string; status: Appointment['status']; checked_in_at: string | null; notes: string },
+  ownerUsername: string,
+  patientName: string
+): Appointment {
+  return {
+    ...appointment,
+    patient_name: appointment.patient_name ?? patientName,
+    owner_username: appointment.owner_username ?? ownerUsername,
+  };
+}
+
+function loadSharedAppointments(): Appointment[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const stored = localStorage.getItem(SHARED_APPOINTMENTS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Appointment[];
+      return Array.isArray(parsed)
+        ? parsed.map((appointment) => ({
+            ...appointment,
+            patient_name: appointment.patient_name ?? 'Unknown patient',
+            owner_username: appointment.owner_username ?? 'shared',
+          }))
+        : [];
+    }
+
+    const mergedAppointments: Appointment[] = [];
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith(`${STORE_KEY_PREFIX}:`) || key === SHARED_APPOINTMENTS_KEY) {
+        continue;
+      }
+
+      const scopeName = key.slice(`${STORE_KEY_PREFIX}:`.length);
+      const rawState = localStorage.getItem(key);
+      if (!rawState) {
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(rawState) as { patients?: Patient[]; appointments?: Appointment[] };
+        const patientNames = new Map((parsed.patients ?? []).map((patient) => [patient.id, patient.name]));
+
+        (parsed.appointments ?? []).forEach((appointment) => {
+          mergedAppointments.push(
+            normalizeAppointment(
+              appointment,
+              scopeName,
+              patientNames.get(appointment.patient_id) ?? 'Unknown patient'
+            )
+          );
+        });
+      } catch (error) {
+        console.warn('Failed to migrate legacy calendar data:', error);
+      }
+    }
+
+    localStorage.setItem(SHARED_APPOINTMENTS_KEY, JSON.stringify(mergedAppointments));
+    return mergedAppointments;
+  } catch (error) {
+    console.warn('Failed to load shared appointments from localStorage:', error);
+    return [];
+  }
+}
+
+function saveSharedAppointments(appointments: Appointment[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    localStorage.setItem(SHARED_APPOINTMENTS_KEY, JSON.stringify(appointments));
+  } catch (error) {
+    console.warn('Failed to save shared appointments to localStorage:', error);
   }
 }
 
@@ -205,9 +282,10 @@ function buildLocalPatient(patient: PatientInput): Patient {
   };
 }
 
-function buildLocalAppointment(appointment: AppointmentInput): Appointment {
+function buildLocalAppointment(appointment: AppointmentInput, defaultOwnerUsername: string): Appointment {
   return {
     ...appointment,
+    owner_username: appointment.owner_username || defaultOwnerUsername,
     id: uuidv4(),
   };
 }
@@ -227,10 +305,11 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
     const activeUsername = getActiveUsernameFromStorage();
     const stored = loadScopedStore(activeUsername);
+    const sharedAppointments = loadSharedAppointments();
 
     set({
       patients: stored?.patients ?? [],
-      appointments: stored?.appointments ?? [],
+      appointments: sharedAppointments,
       consultations: stored?.consultations ?? [],
       attachments: stored?.attachments ?? [],
       isInitialized: true,
@@ -240,10 +319,11 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
   setActiveUserScope: async (username) => {
     const stored = loadScopedStore(username);
+    const sharedAppointments = loadSharedAppointments();
 
     set({
       patients: stored?.patients ?? [],
-      appointments: stored?.appointments ?? [],
+      appointments: sharedAppointments,
       consultations: stored?.consultations ?? [],
       attachments: stored?.attachments ?? [],
       isInitialized: true,
@@ -258,7 +338,6 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
       const newPatients = [...state.patients, fallbackPatient];
       saveScopedStore(state.activeUsername, {
         patients: newPatients,
-        appointments: state.appointments,
         consultations: state.consultations,
         attachments: state.attachments,
       });
@@ -271,6 +350,7 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
   addPatientAndQueue: async (patient, appointmentNotes) => {
     const createdAt = new Date().toISOString();
+    const activeUsername = get().activeUsername ?? '';
     const fallbackPatient: Patient = {
       ...patient,
       id: uuidv4(),
@@ -279,6 +359,8 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
     const fallbackAppointment: Appointment = {
       id: uuidv4(),
       patient_id: fallbackPatient.id,
+      patient_name: fallbackPatient.name,
+      owner_username: activeUsername,
       date_time: createdAt,
       status: 'waiting',
       checked_in_at: createdAt,
@@ -288,9 +370,9 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
     set((state) => {
       const newPatients = [...state.patients, fallbackPatient];
       const newAppointments = [...state.appointments, fallbackAppointment];
+      saveSharedAppointments(newAppointments);
       saveScopedStore(state.activeUsername, {
         patients: newPatients,
-        appointments: newAppointments,
         consultations: state.consultations,
         attachments: state.attachments,
       });
@@ -312,7 +394,6 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
 
       saveScopedStore(state.activeUsername, {
         patients: newPatients,
-        appointments: state.appointments,
         consultations: state.consultations,
         attachments: state.attachments,
       });
@@ -324,13 +405,13 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
   getPatientById: (id) => get().patients.find((patient) => patient.id === id),
 
   addAppointment: async (appointment) => {
-    const fallbackAppointment = buildLocalAppointment(appointment);
+    const fallbackAppointment = buildLocalAppointment(appointment, get().activeUsername ?? '');
 
     set((state) => {
       const newAppointments = [...state.appointments, fallbackAppointment];
+      saveSharedAppointments(newAppointments);
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
-        appointments: newAppointments,
         consultations: state.consultations,
         attachments: state.attachments,
       });
@@ -356,9 +437,9 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
           : appointment
       );
 
+      saveSharedAppointments(newAppointments);
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
-        appointments: newAppointments,
         consultations: state.consultations,
         attachments: state.attachments,
       });
@@ -391,9 +472,9 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
         return appointment;
       });
 
+      saveSharedAppointments(newAppointments);
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
-        appointments: newAppointments,
         consultations: state.consultations,
         attachments: state.attachments,
       });
@@ -427,7 +508,6 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
       const newConsultations = [...state.consultations, fallbackConsultation];
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
-        appointments: state.appointments,
         consultations: newConsultations,
         attachments: state.attachments,
       });
@@ -452,7 +532,6 @@ export const useClinicStore = create<ClinicStore>((set, get) => ({
       const newAttachments = [...state.attachments, newAttachment];
       saveScopedStore(state.activeUsername, {
         patients: state.patients,
-        appointments: state.appointments,
         consultations: state.consultations,
         attachments: newAttachments,
       });
