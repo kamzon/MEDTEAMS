@@ -624,7 +624,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="w-full p-8 bg-slate-50 min-h-screen">
+    <div className="w-full min-h-screen bg-slate-50 p-8 dark:bg-slate-950">
       {/* Header with Greeting & Quick Actions */}
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -642,7 +642,7 @@ export default function DashboardPage() {
         </div>
 
         {currentUser && (
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="text-right">
               <p className="text-sm font-semibold text-slate-900">{currentUser?.name}</p>
               <p className="text-xs text-slate-500">{isFrench ? 'Rôle' : 'Role'}: {currentUser?.role}</p>
@@ -656,7 +656,7 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={() => handleQuickAction(isFrench ? 'Scanner le QR patient' : 'Scan Patient QR')}
-          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-teal-300 transition-all group"
+          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-teal-300 transition-all group dark:border-slate-800 dark:bg-slate-900 dark:hover:border-teal-500/40"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center group-hover:bg-teal-100 transition">
@@ -673,7 +673,7 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={() => setWalkInFormOpen(true)}
-          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all group"
+          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all group dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-slate-200 transition">
@@ -698,7 +698,7 @@ export default function DashboardPage() {
             setSearchQuery('');
             setIsDropdownOpen(false);
           }}
-          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all group"
+          className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all group dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-slate-200 transition">
@@ -721,8 +721,8 @@ export default function DashboardPage() {
 
       {walkInFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{ui.registerWalkInTitle}</h2>
                 <p className="text-sm text-slate-500">{ui.registerWalkInSubtitle}</p>
@@ -730,7 +730,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setWalkInFormOpen(false)}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-50"
               >
                 {ui.close}
               </button>
@@ -738,40 +738,40 @@ export default function DashboardPage() {
 
             <form onSubmit={handleWalkInSubmit} className="grid gap-4 px-6 py-6 md:grid-cols-2">
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{ui.fullName}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.fullName}</span>
                 <input
                   required
                   value={walkInForm.name}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, name: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 dark:focus:ring-teal-900/30"
                   placeholder={isFrench ? 'ex. Khadija El Idrissi' : 'e.g. Khadija El Idrissi'}
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">{ui.phone}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.phone}</span>
                 <input
                   required
                   value={walkInForm.phone}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, phone: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 dark:focus:ring-teal-900/30"
                   placeholder="+212 6 00 00 00 00"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">{ui.birthDate}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.birthDate}</span>
                 <input
                   required
                   type="date"
                   value={walkInForm.birth_date}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, birth_date: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                 />
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{ui.insuranceScheme}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.insuranceScheme}</span>
                 <select
                   value={walkInForm.insurance_scheme}
                   onChange={(event) =>
@@ -780,7 +780,7 @@ export default function DashboardPage() {
                       insurance_scheme: event.target.value as 'AMO-Achamil' | 'AMO-Tadamon' | 'CNSS-Private',
                     }))
                   }
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                 >
                   <option value="AMO-Achamil">AMO-Achamil</option>
                   <option value="AMO-Tadamon">AMO-Tadamon</option>
@@ -789,21 +789,21 @@ export default function DashboardPage() {
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{ui.chronicConditions}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.chronicConditions}</span>
                 <textarea
                   value={walkInForm.chronic_conditions}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, chronic_conditions: event.target.value }))}
-                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                   placeholder={ui.separateWithCommas}
                 />
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{ui.allergies}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.allergies}</span>
                 <textarea
                   value={walkInForm.allergies}
                   onChange={(event) => setWalkInForm((current) => ({ ...current, allergies: event.target.value }))}
-                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                   placeholder={ui.separateWithCommas}
                 />
               </label>
@@ -812,7 +812,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setWalkInFormOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {ui.cancel}
                 </button>
@@ -830,8 +830,8 @@ export default function DashboardPage() {
 
       {queueFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{ui.queueTitle}</h2>
                 <p className="text-sm text-slate-500">{ui.queueSubtitle}</p>
@@ -839,7 +839,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={closeQueueModal}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-50"
               >
                 {ui.close}
               </button>
@@ -847,7 +847,7 @@ export default function DashboardPage() {
 
             <form onSubmit={handleQueueExistingSubmit} className="grid gap-4 px-6 py-6 md:grid-cols-2">
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{ui.existingPatient}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.existingPatient}</span>
                 <div className="relative">
                   <input
                     required
@@ -864,11 +864,11 @@ export default function DashboardPage() {
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
                     placeholder={ui.searchPlaceholder}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 dark:focus:ring-teal-900/30"
                   />
 
                   {isDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100">
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:ring-slate-800">
                       {filteredPatients.length > 0 ? (
                         filteredPatients.map((patient) => (
                           <button
@@ -882,9 +882,9 @@ export default function DashboardPage() {
                               setSearchQuery(patient.name);
                               setIsDropdownOpen(false);
                             }}
-                            className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50"
+                            className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
                           >
-                            <span className="text-sm font-semibold text-slate-900">{patient.name}</span>
+                            <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{patient.name}</span>
                             <span className="text-xs text-slate-500">AMO ID: {patient.amo_id}</span>
                           </button>
                         ))
@@ -902,11 +902,11 @@ export default function DashboardPage() {
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">{ui.queueNotes}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.queueNotes}</span>
                 <textarea
                   value={queueForm.notes}
                   onChange={(event) => setQueueForm((current) => ({ ...current, notes: event.target.value }))}
-                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                   placeholder={ui.queueNotesPlaceholder}
                 />
               </label>
@@ -915,13 +915,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={closeQueueModal}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {ui.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors dark:bg-teal-500 dark:hover:bg-teal-400"
                 >
                   {ui.queuePatient}
                 </button>
@@ -937,7 +937,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Stats Cards - Smaller & Sleeker */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
@@ -953,7 +953,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
@@ -969,7 +969,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
@@ -987,7 +987,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Live Waiting Room - Enhanced */}
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-5 h-5 bg-orange-100 rounded-lg flex items-center justify-center">
                 <Clock className="w-3 h-3 text-orange-600" strokeWidth={2.5} />
@@ -1090,7 +1090,7 @@ export default function DashboardPage() {
             )}
 
             {/* Completed Today */}
-            <div className="mt-6 bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+            <div className="mt-6 bg-white border border-slate-200 rounded-xl shadow-sm p-6 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-5 h-5 bg-teal-100 rounded-lg flex items-center justify-center">
                   <ClipboardCheck className="w-3.5 h-3.5 text-teal-600" strokeWidth={2.5} />
@@ -1102,7 +1102,7 @@ export default function DashboardPage() {
               </div>
 
               {completedExaminations.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-950">
                   <p className="text-sm font-medium text-slate-700">{ui.noCompletedExams}</p>
                   <p className="mt-1 text-xs text-slate-500">{ui.completedAppearsHere}</p>
                 </div>
@@ -1115,13 +1115,13 @@ export default function DashboardPage() {
                       <Link
                         key={entry.id}
                         href={`/patients/${entry.patientId}`}
-                        className="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/50 focus:outline-none focus:ring-4 focus:ring-teal-100"
+                        className="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/50 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-teal-500/30 dark:hover:bg-slate-800/60 dark:focus:ring-teal-900/30"
                       >
                         <article className="cursor-pointer">
                           <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <h3 className="truncate text-sm font-semibold text-slate-900">
+                                <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
                                   {entry.patientName}
                                 </h3>
                                 <span className="text-xs font-medium text-slate-500">{completedTime}</span>
@@ -1135,7 +1135,7 @@ export default function DashboardPage() {
                               className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${
                                 entry.hasPrescription
                                   ? 'border border-teal-200 bg-teal-50 text-teal-700'
-                                  : 'border border-slate-200 bg-slate-100 text-slate-600'
+                                  : 'border border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
                               }`}
                             >
                               {entry.hasPrescription ? ui.prescriptionIssued : ui.noMedication}
@@ -1152,7 +1152,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right Side - Today's Agenda (1 column) */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 h-fit">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 h-fit dark:border-slate-800 dark:bg-slate-900">
           <h2 className="text-lg font-bold text-slate-900 mb-6">{ui.todayAgenda}</h2>
 
           {todaysAgenda.length === 0 ? (

@@ -208,6 +208,17 @@ export default function CalendarPage() {
       : 'Select which clinic calendars are visible, like Outlook.',
     showAllCalendars: isFrench ? 'Afficher tous les agendas' : 'Show all calendars',
     time: isFrench ? 'Heure' : 'Time',
+    timeHeader: isFrench ? 'Heure' : 'Time',
+    visible: isFrench ? 'Visible' : 'Visible',
+    hidden: isFrench ? 'Masqué' : 'Hidden',
+    you: isFrench ? 'Vous' : 'You',
+    statusLabels: {
+      scheduled: isFrench ? 'Planifié' : 'Scheduled',
+      waiting: isFrench ? 'En attente' : 'Waiting',
+      in_exam: isFrench ? 'En consultation' : 'In Exam',
+      billing: isFrench ? 'Facturation' : 'Billing',
+      completed: isFrench ? 'Terminé' : 'Completed',
+    },
     createAppointment: (day: Date, slotLabel: string) =>
       isFrench
         ? `Créer un rendez-vous pour le ${day.toLocaleDateString('fr-FR', {
@@ -273,16 +284,7 @@ export default function CalendarPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const labels: Record<string, string> = {
-      scheduled: 'Scheduled',
-      waiting: 'Waiting',
-      in_exam: 'In Exam',
-      billing: 'Billing',
-      completed: 'Completed',
-    };
-    return labels[status] || status;
-  };
+  const getStatusBadge = (status: string) => ui.statusLabels[status as keyof typeof ui.statusLabels] || status;
 
   const filteredPatients = patients.filter((patient) => {
     const query = patientSearchQuery.trim().toLowerCase();
@@ -325,7 +327,7 @@ export default function CalendarPage() {
   }, []);
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 p-8">
+    <div className="w-full min-h-screen bg-slate-50 p-8 dark:bg-slate-950">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -352,22 +354,22 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between mb-8">
         <button
           onClick={() => moveWeek('prev')}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-slate-700 font-medium"
+          className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <ChevronLeft className="w-4 h-4" />
           {ui.previousWeek}
         </button>
-        <span className="text-sm font-semibold text-slate-600">{ui.weekView}</span>
+        <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{ui.weekView}</span>
         <button
           onClick={() => moveWeek('next')}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-slate-700 font-medium"
+          className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           {ui.nextWeek}
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
       {/* People Bar */}
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{ui.people}</p>
@@ -414,7 +416,7 @@ export default function CalendarPage() {
                     isVisible ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-600'
                   }`}
                 >
-                  {isVisible ? 'Visible' : 'Hidden'}
+                  {isVisible ? ui.visible : ui.hidden}
                 </span>
               </button>
             );
@@ -423,22 +425,22 @@ export default function CalendarPage() {
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div ref={calendarScrollRef} className="overflow-auto max-h-[75vh] scroll-smooth">
           {/* Header Row - Day Names */}
-          <div className="grid grid-cols-8 border-b border-slate-200 sticky top-0 z-20 bg-white">
+          <div className="sticky top-0 z-20 grid grid-cols-8 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             {/* Time column header */}
-            <div className="col-span-1 p-4 bg-slate-50 border-r border-slate-200">
-              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Time</p>
+            <div className="col-span-1 border-r border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{ui.timeHeader}</p>
             </div>
 
             {/* Day headers */}
             {weekDays.map((day, idx) => (
-              <div key={idx} className="col-span-1 p-4 bg-white border-r border-slate-200 text-center">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  {day.toLocaleDateString('en-US', { weekday: 'short' })}
+              <div key={idx} className="col-span-1 border-r border-slate-200 bg-white p-4 text-center dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  {day.toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', { weekday: 'short' })}
                 </p>
-                <p className="text-lg font-bold text-slate-900 mt-1">{day.getDate()}</p>
+                <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-50">{day.getDate()}</p>
               </div>
             ))}
           </div>
@@ -448,14 +450,14 @@ export default function CalendarPage() {
             const isBusinessHour = slot.hour >= 8 && slot.hour <= 18;
 
             return (
-              <div key={slotIdx} data-hour={slot.hour} className="grid grid-cols-8 border-b border-slate-200 min-h-24">
+              <div key={slotIdx} data-hour={slot.hour} className="grid min-h-24 grid-cols-8 border-b border-slate-200 dark:border-slate-800">
                 {/* Time label */}
                 <div
-                  className={`col-span-1 p-4 border-r border-slate-200 flex items-center justify-center sticky left-0 z-10 ${
-                    isBusinessHour ? 'bg-white' : 'bg-slate-50'
+                  className={`sticky left-0 z-10 col-span-1 flex items-center justify-center border-r border-slate-200 p-4 dark:border-slate-800 ${
+                    isBusinessHour ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-950'
                   }`}
                 >
-                  <p className="text-sm font-semibold text-slate-700">{slot.label}</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{slot.label}</p>
                 </div>
 
                 {/* Day cells */}
@@ -475,12 +477,12 @@ export default function CalendarPage() {
                           openAppointmentModal(day, slot.hour);
                         }
                       }}
-                      className={`col-span-1 p-2 border-r border-slate-200 relative text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-200 ${
+                      className={`col-span-1 relative border-r border-slate-200 p-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-200 dark:border-slate-800 ${
                         hasAppointments
-                          ? 'bg-white cursor-default'
+                          ? 'bg-white cursor-default dark:bg-slate-900'
                           : isBusinessHour
-                            ? 'bg-white hover:bg-teal-50/60 cursor-pointer'
-                            : 'bg-slate-50 hover:bg-slate-100 cursor-pointer'
+                            ? 'bg-white hover:bg-teal-50/60 cursor-pointer dark:bg-slate-900 dark:hover:bg-slate-800'
+                            : 'bg-slate-50 hover:bg-slate-100 cursor-pointer dark:bg-slate-950 dark:hover:bg-slate-900'
                       }`}
                       aria-label={createAppointmentLabel(day, slot.label)}
                     >
@@ -489,27 +491,27 @@ export default function CalendarPage() {
                           {slotAppointments.map((apt) => {
                             const aptTime = new Date(apt.date_time);
                             const displayTime = `${String(aptTime.getHours()).padStart(2, '0')}:${String(aptTime.getMinutes()).padStart(2, '0')}`;
-                            const ownerLabel = apt.owner_username === currentUser?.username ? 'You' : apt.owner_username;
+                            const ownerLabel = apt.owner_username === currentUser?.username ? ui.you : apt.owner_username;
 
                             return (
                               <div
                                 key={apt.id}
                                 className={`p-2 rounded-lg border-l-4 text-xs cursor-pointer hover:shadow-md transition-shadow ${getStatusColor(apt.status)}`}
                               >
-                                <div className="font-semibold text-slate-900 truncate">
+                                <div className="truncate font-semibold text-slate-900 dark:text-slate-50">
                                   {apt.patient_name || (isFrench ? 'Patient inconnu' : 'Unknown patient')}
                                 </div>
-                                <div className="text-slate-600 mt-1 flex items-center gap-1">
+                                <div className="mt-1 flex items-center gap-1 text-slate-600 dark:text-slate-300">
                                   <Clock className="w-3 h-3" />
                                   {displayTime}
                                 </div>
                                 <div className="mt-1">
-                                  <span className="inline-block px-1.5 py-0.5 bg-white bg-opacity-60 rounded text-xs font-medium">
+                                  <span className="inline-block rounded bg-white bg-opacity-60 px-1.5 py-0.5 text-xs font-medium dark:bg-slate-800 dark:text-slate-100">
                                     {getStatusBadge(apt.status)}
                                   </span>
                                 </div>
                                 <div className="mt-1">
-                                  <span className="inline-block rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  <span className="inline-block rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
                                     {ownerLabel}
                                   </span>
                                 </div>
@@ -536,9 +538,9 @@ export default function CalendarPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{ui.scheduleAppointment}</h2>
                 <p className="text-sm text-slate-500 mt-1">{ui.modalDescription}</p>
@@ -546,7 +548,7 @@ export default function CalendarPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
               >
                 {ui.close}
               </button>
@@ -556,7 +558,7 @@ export default function CalendarPage() {
             <form onSubmit={handleAddAppointment} className="grid gap-4 px-6 py-6">
               {/* Patient Select */}
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                   <User className="w-4 h-4" />
                   {ui.patient}
                 </span>
@@ -573,11 +575,11 @@ export default function CalendarPage() {
                     }}
                     onFocus={() => setIsPatientDropdownOpen(true)}
                     placeholder={ui.searchPlaceholder}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 dark:focus:ring-teal-900/30"
                   />
 
                   {isPatientDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100">
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:ring-slate-800">
                       {filteredPatients.length > 0 ? (
                         filteredPatients.map((patient) => (
                           <button
@@ -591,9 +593,9 @@ export default function CalendarPage() {
                               setPatientSearchQuery(`${patient.name} (${patient.amo_id})`);
                               setIsPatientDropdownOpen(false);
                             }}
-                            className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50"
+                            className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
                           >
-                            <span className="text-sm font-semibold text-slate-900">{patient.name}</span>
+                            <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{patient.name}</span>
                             <span className="text-xs text-slate-500">AMO ID: {patient.amo_id}</span>
                           </button>
                         ))
@@ -609,7 +611,7 @@ export default function CalendarPage() {
 
               {/* Date & Time */}
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                   <CalendarIcon className="w-4 h-4" />
                   {ui.dateTime}
                 </span>
@@ -620,20 +622,20 @@ export default function CalendarPage() {
                   name="dateTime"
                   value={formData.dateTime}
                   onChange={handleFormChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                 />
               </label>
 
               {/* Reason/Notes */}
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">{ui.reason}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{ui.reason}</span>
                 <textarea
                   required
                   name="reason"
                   value={formData.reason}
                   onChange={handleFormChange}
                   placeholder={ui.reasonPlaceholder}
-                  className="min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                  className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:ring-teal-900/30"
                 />
               </label>
 
@@ -642,13 +644,13 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {ui.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-400"
                 >
                   {ui.save}
                 </button>
@@ -660,11 +662,11 @@ export default function CalendarPage() {
 
       {/* Stats Footer */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{ui.totalAppointments}</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">{visibleAppointments.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{ui.thisWeek}</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">
             {visibleAppointments.filter((apt) => {
@@ -675,7 +677,7 @@ export default function CalendarPage() {
             }).length}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{ui.completed}</p>
           <p className="text-3xl font-bold text-slate-900 mt-2">
             {visibleAppointments.filter((apt) => apt.status === 'completed').length}

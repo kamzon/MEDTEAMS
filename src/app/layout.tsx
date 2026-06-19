@@ -20,7 +20,6 @@ export default function RootLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const language = useAppSettingsStore((state) => state.language);
-  const themeMode = useAppSettingsStore((state) => state.themeMode);
   const initSettings = useAppSettingsStore((state) => state.initSettings);
 
   useEffect(() => {
@@ -34,19 +33,18 @@ export default function RootLayout({
   }, [initSettings]);
 
   useEffect(() => {
-    document.documentElement.lang = language === 'FR' ? 'fr' : 'en';
-    document.documentElement.classList.toggle('dark', themeMode === 'dark');
-  }, [language, themeMode]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   return (
     <html lang={language === 'FR' ? 'fr' : 'en'}>
-      <body className="flex h-screen bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-50">
+      <body className="flex h-screen bg-slate-50 text-slate-900 transition-colors duration-300">
         <AuthProvider>
           {/* Sidebar Navigation */}
           <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
           {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto overflow-x-hidden transition-colors duration-300 dark:bg-slate-950">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 transition-colors duration-300">
             {children}
           </main>
         </AuthProvider>

@@ -43,7 +43,6 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
 
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
-      document.documentElement.classList.toggle('dark', themeMode === 'dark');
     }
   },
 
@@ -69,6 +68,6 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
     });
 
     document.documentElement.lang = nextLanguage === 'FR' ? 'fr' : 'en';
-    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+    document.documentElement.classList.remove('dark');
   },
 }));
