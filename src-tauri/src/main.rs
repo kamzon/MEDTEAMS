@@ -15,6 +15,7 @@ use database::{
     fetch_consultations,
     fetch_patients,
     fetch_users,
+    delete_user,
     init_database,
     insert_appointment,
     insert_patient,
@@ -22,6 +23,7 @@ use database::{
     insert_user,
     insert_consultation,
     update_patient_status_in_appointments,
+    update_user_role,
     AppointmentRecord,
     AppState,
     AttachmentRecord,
@@ -137,6 +139,30 @@ async fn add_user(
 }
 
 #[tauri::command]
+async fn update_user_role_command(
+    state: State<'_, AppState>,
+    user_id: String,
+    role: String,
+) -> Result<UserRecord, String> {
+    update_user_role(&state.db, &user_id, &role)
+        .await
+        .map_err(|error| match error {
+            sqlx::Error::RowNotFound => "Staff member not found".to_string(),
+            other => format!("Failed to update user role: {}", other),
+        })
+}
+
+#[tauri::command]
+async fn delete_user_command(state: State<'_, AppState>, user_id: String) -> Result<(), String> {
+    delete_user(&state.db, &user_id)
+        .await
+        .map_err(|error| match error {
+            sqlx::Error::RowNotFound => "Staff member not found".to_string(),
+            other => format!("Failed to delete user: {}", other),
+        })
+}
+
+#[tauri::command]
 async fn update_patient_status(
     state: State<'_, AppState>,
     patient_id: String,
@@ -195,6 +221,8 @@ async fn main() {
             add_appointment,
             add_patient_and_queue,
             add_user,
+            update_user_role_command,
+            delete_user_command,
             update_patient_status,
             save_consultation
         ])

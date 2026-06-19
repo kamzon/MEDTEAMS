@@ -2,6 +2,8 @@
 
 import { useEffect, useState, FormEvent } from 'react';
 import { Users, Plus, X } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { addLocalUser, deleteLocalUser, loadLocalUsers, updateLocalUserRole } from '@/lib/localUsers';
 
 type UserRole = 'DOCTOR' | 'SECRETARY' | 'OWNER';
 
@@ -33,12 +35,16 @@ async function invokeTauriCommand<T>(command: string, args?: Record<string, unkn
 }
 
 export default function SettingsPage() {
+  const { currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, UserRole>>({});
 
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -51,14 +57,30 @@ export default function SettingsPage() {
     setIsLoading(true);
     setError(null);
     try {
+      let nextUsers: User[] = [];
+
       if (isTauriRuntime()) {
         const result = await invokeTauriCommand<User[]>('get_users');
-        setUsers(result || []);
+        nextUsers = result || [];
       } else {
-        setUsers([{ id: '1', username: 'admin', role: 'OWNER', name: 'Dr. Tazi' }]);
+        nextUsers = loadLocalUsers().map(({ id, username, role, name }) => ({
+            id,
+            username,
+            role: role as UserRole,
+            name,
+          }));
       }
+
+      setUsers(nextUsers);
+      setRoleDrafts(
+        nextUsers.reduce<Record<string, UserRole>>((drafts, user) => {
+          drafts[user.id] = user.role;
+          return drafts;
+        }, {})
+      );
     } catch {
       setUsers([]);
+      setRoleDrafts({});
     } finally {
       setIsLoading(false);
     }
@@ -73,31 +95,105 @@ export default function SettingsPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleRoleChange = (userId: string, role: UserRole) => {
+    setRoleDrafts((prev) => ({ ...prev, [userId]: role }));
+  };
+
+  const handleUpdateRole = async (user: User) => {
+    const nextRole = roleDrafts[user.id] ?? user.role;
+    if (nextRole === user.role) {
+      return;
+    }
+
+    setSavingUserId(user.id);
+    setError(null);
+
+    try {
+      if (isTauriRuntime()) {
+        await invokeTauriCommand('update_user_role_command', {
+          user_id: user.id,
+          role: nextRole,
+        });
+      } else {
+        updateLocalUserRole(user.id, nextRole);
+      }
+
+      setSuccessMessage(`${user.name} role updated to ${nextRole}`);
+      await fetchUsers();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update staff role');
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (user.role === 'OWNER') {
+      setError('Owner account cannot be deleted');
+      return;
+    }
+
+    if (currentUser?.id === user.id) {
+      setError('You cannot delete the account you are currently using');
+      return;
+    }
+
+    const shouldDelete = window.confirm(`Delete ${user.name}? This cannot be undone.`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingUserId(user.id);
+    setError(null);
+
+    try {
+      if (isTauriRuntime()) {
+        await invokeTauriCommand('delete_user_command', { user_id: user.id });
+      } else {
+        deleteLocalUser(user.id);
+      }
+
+      setSuccessMessage(`${user.name} was deleted successfully`);
+      await fetchUsers();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete staff member');
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
     try {
-      await invokeTauriCommand('add_user', {
-        username: formData.username.trim(),
-        password: formData.password,
-        role: formData.role,
-        name: formData.name.trim(),
-      });
-      setSuccessMessage(`${formData.name} has been added successfully!`);
+      if (isTauriRuntime()) {
+        await invokeTauriCommand('add_user', {
+          username: formData.username.trim(),
+          password: formData.password,
+          role: formData.role,
+          name: formData.name.trim(),
+        });
+        setSuccessMessage(`${formData.name} has been added successfully!`);
+        await fetchUsers();
+      } else {
+        addLocalUser({
+          username: formData.username.trim(),
+          password: formData.password,
+          role: formData.role,
+          name: formData.name.trim(),
+        });
+        setSuccessMessage(`${formData.name} has been added successfully!`);
+        await fetchUsers();
+      }
+
       setTimeout(() => setSuccessMessage(null), 3000);
       setFormData({ name: '', username: '', password: '', role: 'DOCTOR' });
       setIsModalOpen(false);
-      await fetchUsers();
     } catch (err) {
-      if (!isTauriRuntime()) {
-        setSuccessMessage(`${formData.name} would be added in Tauri mode`);
-        setTimeout(() => setSuccessMessage(null), 3000);
-        setFormData({ name: '', username: '', password: '', role: 'DOCTOR' });
-        setIsModalOpen(false);
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to add staff member');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to add staff member');
     } finally {
       setIsSubmitting(false);
     }
@@ -175,6 +271,7 @@ export default function SettingsPage() {
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Username</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Role</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Member Since</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -209,6 +306,35 @@ export default function SettingsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-slate-500 text-sm">Recently added</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={roleDrafts[user.id] ?? user.role}
+                            onChange={(event) => handleRoleChange(user.id, event.target.value as UserRole)}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                          >
+                            <option value="DOCTOR">Doctor</option>
+                            <option value="SECRETARY">Secretary</option>
+                            <option value="OWNER">Owner</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateRole(user)}
+                            disabled={(roleDrafts[user.id] ?? user.role) === user.role || savingUserId === user.id}
+                            className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-600/50"
+                          >
+                            {savingUserId === user.id ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={deletingUserId === user.id || currentUser?.id === user.id || user.role === 'OWNER'}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {deletingUserId === user.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

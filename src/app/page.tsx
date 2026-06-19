@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useClinicStore } from '../store/useClinicStore';
 import { useAuth } from '@/context/AuthContext';
+import { addLocalUser, loginLocalUser, loadLocalUsers, USERS_STORAGE_KEY } from '@/lib/localUsers';
 import {
   Users,
   Clock,
@@ -22,21 +23,7 @@ type SessionUser = {
   name: string;
 };
 
-type StoredAuthUser = SessionUser & {
-  password: string;
-};
-
 const AUTH_STORAGE_KEY = 'medteams-active-user';
-const USERS_STORAGE_KEY = 'medteams-auth-users';
-const DEFAULT_LOCAL_USERS: StoredAuthUser[] = [
-  {
-    id: 'local-admin',
-    username: 'admin',
-    password: 'admin123',
-    role: 'OWNER',
-    name: 'Dr. Tazi',
-  },
-];
 
 function isTauriRuntime() {
   if (typeof window === 'undefined') {
@@ -53,74 +40,6 @@ function isTauriRuntime() {
   };
 
   return Boolean(tauriWindow.__TAURI__?.invoke || tauriWindow.__TAURI__?.core?.invoke);
-}
-
-function loadLocalUsers(): StoredAuthUser[] {
-  if (typeof window === 'undefined') {
-    return DEFAULT_LOCAL_USERS;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(USERS_STORAGE_KEY);
-    if (!stored) {
-      window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_LOCAL_USERS));
-      return DEFAULT_LOCAL_USERS;
-    }
-
-    const parsed = JSON.parse(stored) as StoredAuthUser[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_LOCAL_USERS));
-      return DEFAULT_LOCAL_USERS;
-    }
-
-    return parsed;
-  } catch {
-    window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_LOCAL_USERS));
-    return DEFAULT_LOCAL_USERS;
-  }
-}
-
-function saveLocalUsers(users: StoredAuthUser[]) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-}
-
-function loginLocalUser(username: string, password: string) {
-  const users = loadLocalUsers();
-  const match = users.find(
-    (user) => user.username.toLowerCase() === username.toLowerCase() && user.password === password
-  );
-
-  if (!match) {
-    throw new Error('Invalid username or password');
-  }
-
-  const { password: _password, ...sessionUser } = match;
-  return sessionUser;
-}
-
-function addLocalUser(user: Omit<StoredAuthUser, 'id'>) {
-  const users = loadLocalUsers();
-  const usernameExists = users.some(
-    (existingUser) => existingUser.username.toLowerCase() === user.username.toLowerCase()
-  );
-
-  if (usernameExists) {
-    throw new Error('Username already exists');
-  }
-
-  const createdUser: StoredAuthUser = {
-    id: `local-${Date.now()}`,
-    ...user,
-  };
-
-  saveLocalUsers([...users, createdUser]);
-
-  const { password: _password, ...sessionUser } = createdUser;
-  return sessionUser;
 }
 
 async function invokeTauriCommand<T>(command: string, args?: Record<string, unknown>) {

@@ -351,6 +351,93 @@ pub async fn insert_user(pool: &DbPool, user: NewUserInput) -> Result<UserRecord
     })
 }
 
+/// Update a user's role in the database.
+pub async fn update_user_role(
+    pool: &DbPool,
+    user_id: &str,
+    role: &str,
+) -> Result<UserRecord, sqlx::Error> {
+    let affected = sqlx::query(
+        r#"
+        UPDATE users
+        SET role = ?
+        WHERE id = ?
+        "#,
+    )
+    .bind(role)
+    .bind(user_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    if affected == 0 {
+        return Err(sqlx::Error::RowNotFound);
+    }
+
+    let row = sqlx::query_as::<_, UserRow>(
+        r#"
+        SELECT
+            id,
+            username,
+            role,
+            name
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(UserRecord {
+        id: row.id,
+        username: row.username,
+        role: row.role,
+        name: row.name,
+    })
+}
+
+/// Delete a user from the database.
+pub async fn delete_user(pool: &DbPool, user_id: &str) -> Result<(), sqlx::Error> {
+    let role: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT role
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(role) = role else {
+        return Err(sqlx::Error::RowNotFound);
+    };
+
+    if role == "OWNER" {
+        return Err(sqlx::Error::Protocol("Owner account cannot be deleted".into()));
+    }
+
+    let affected = sqlx::query(
+        r#"
+        DELETE FROM users
+        WHERE id = ?
+        "#,
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    if affected == 0 {
+        return Err(sqlx::Error::RowNotFound);
+    }
+
+    Ok(())
+}
+
 /// Fetch all appointments from the database.
 pub async fn fetch_appointments(pool: &DbPool) -> Result<Vec<AppointmentRecord>, sqlx::Error> {
     let rows = sqlx::query_as::<_, AppointmentRow>(
