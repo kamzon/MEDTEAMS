@@ -161,7 +161,14 @@ export default function CalendarPage() {
         return currentSelection.filter((username) => users.some((user) => user.username === username));
       }
 
-      return users.map((user) => user.username);
+      // Default to current user's calendar only, if available
+      const current = currentUser?.username;
+      if (current && users.some((u) => u.username === current)) {
+        return [current];
+      }
+
+      // If no current user, fall back to first available local user, or empty
+      return users.length > 0 ? [users[0].username] : [];
     });
   }, []);
 
