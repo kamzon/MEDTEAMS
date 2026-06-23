@@ -204,8 +204,8 @@ export default function CalendarPage() {
     nextWeek: isFrench ? 'Semaine suivante' : 'Next Week',
     people: isFrench ? 'Personnes' : 'People',
     peopleDescription: isFrench
-      ? 'Sélectionnez les agendas de l’équipe à afficher, comme dans Outlook.'
-      : 'Select which clinic calendars are visible, like Outlook.',
+      ? 'Sélectionnez quels agendas de l’équipe afficher.'
+      : 'Select which team calendars to show.',
     showAllCalendars: isFrench ? 'Afficher tous les agendas' : 'Show all calendars',
     time: isFrench ? 'Heure' : 'Time',
     timeHeader: isFrench ? 'Heure' : 'Time',
